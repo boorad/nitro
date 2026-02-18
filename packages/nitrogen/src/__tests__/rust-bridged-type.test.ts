@@ -397,5 +397,90 @@ describe("RustCxxBridgedType", () => {
       expect(bridged.getRustFfiType()).toBe("*mut std::ffi::c_void");
       expect(bridged.getCppFfiType()).toBe("void*");
     });
+
+    test("array: *mut c_void / void*", () => {
+      const bridged = new RustCxxBridgedType(new ArrayType(new NumberType()));
+      expect(bridged.getRustFfiType()).toBe("*mut std::ffi::c_void");
+      expect(bridged.getCppFfiType()).toBe("void*");
+    });
+
+    test("optional: *mut c_void / void*", () => {
+      const bridged = new RustCxxBridgedType(
+        new OptionalType(new NumberType()),
+      );
+      expect(bridged.getRustFfiType()).toBe("*mut std::ffi::c_void");
+      expect(bridged.getCppFfiType()).toBe("void*");
+    });
+
+    test("record: *mut c_void / void*", () => {
+      const bridged = new RustCxxBridgedType(
+        new RecordType(new StringType(), new NumberType()),
+      );
+      expect(bridged.getRustFfiType()).toBe("*mut std::ffi::c_void");
+      expect(bridged.getCppFfiType()).toBe("void*");
+    });
+  });
+
+  describe("parse - array conversions", () => {
+    const bridged = new RustCxxBridgedType(new ArrayType(new NumberType()));
+
+    test("C++ to Rust (in Rust): Box::from_raw to Vec", () => {
+      const code = bridged.parse("arr", "c++", "rust", "rust");
+      expect(code).toContain("Box::from_raw");
+      expect(code).toContain("arr");
+    });
+
+    test("C++ to Rust (in C++): heap-allocate and cast to void*", () => {
+      const code = bridged.parse("arr", "c++", "rust", "c++");
+      expect(code).toContain("static_cast<void*>");
+      expect(code).toContain("new");
+    });
+
+    test("Rust to C++ (in Rust): Box::into_raw", () => {
+      const code = bridged.parse("arr", "rust", "c++", "rust");
+      expect(code).toContain("Box::into_raw");
+      expect(code).toContain("Box::new");
+    });
+
+    test("Rust to C++ (in C++): static_cast back", () => {
+      const code = bridged.parse("arr", "rust", "c++", "c++");
+      expect(code).toContain("static_cast");
+      expect(code).toContain("std::move");
+    });
+  });
+
+  describe("parse - optional conversions", () => {
+    const bridged = new RustCxxBridgedType(new OptionalType(new StringType()));
+
+    test("C++ to Rust (in Rust): Box::from_raw to Option", () => {
+      const code = bridged.parse("opt", "c++", "rust", "rust");
+      expect(code).toContain("Box::from_raw");
+    });
+
+    test("Rust to C++ (in Rust): Box::into_raw", () => {
+      const code = bridged.parse("opt", "rust", "c++", "rust");
+      expect(code).toContain("Box::into_raw");
+    });
+  });
+
+  describe("parse - array buffer conversions", () => {
+    const bridged = new RustCxxBridgedType(new ArrayBufferType());
+
+    test("C++ to Rust (in Rust): Box::from_raw to Vec<u8>", () => {
+      const code = bridged.parse("buf", "c++", "rust", "rust");
+      expect(code).toContain("Box::from_raw");
+      expect(code).toContain("Vec<u8>");
+    });
+
+    test("Rust to C++ (in Rust): Box::into_raw", () => {
+      const code = bridged.parse("buf", "rust", "c++", "rust");
+      expect(code).toContain("Box::into_raw");
+    });
+
+    test("Rust to C++ (in C++): move shared_ptr", () => {
+      const code = bridged.parse("buf", "rust", "c++", "c++");
+      expect(code).toContain("std::move");
+      expect(code).toContain("ArrayBuffer");
+    });
   });
 });

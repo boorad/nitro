@@ -3,11 +3,15 @@ import type { BridgedType } from "../BridgedType.js";
 import { getReferencedTypes } from "../getReferencedTypes.js";
 import type { SourceFile, SourceImport } from "../SourceFile.js";
 import { EnumType } from "../types/EnumType.js";
+import { FunctionType } from "../types/FunctionType.js";
 import { getTypeAs } from "../types/getTypeAs.js";
 import { StructType } from "../types/StructType.js";
 import type { Type } from "../types/Type.js";
+import { VariantType } from "../types/VariantType.js";
 import { createRustEnum } from "./RustEnum.js";
+import { createRustFunction } from "./RustFunction.js";
 import { createRustStruct } from "./RustStruct.js";
+import { createRustVariant } from "./RustVariant.js";
 
 /**
  * Bridges types between Rust and C++ across the `extern "C"` FFI boundary.
@@ -16,7 +20,7 @@ import { createRustStruct } from "./RustStruct.js";
  * - Primitives (f64, bool, i64, u64, i32) pass directly
  * - Strings become *const c_char
  * - Enums pass as i32 discriminants
- * - Complex types (arrays, optionals, etc.) pass as opaque void* pointers
+ * - Complex types (arrays, optionals, structs, etc.) pass as opaque void* pointers
  */
 export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
   readonly type: Type;
@@ -36,33 +40,19 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
   get needsSpecialHandling(): boolean {
     switch (this.type.kind) {
       case "string":
-        return true;
       case "array":
-        return true;
       case "optional":
-        return true;
       case "record":
-        return true;
       case "enum":
-        return true;
       case "struct":
-        return true;
       case "variant":
-        return true;
       case "function":
-        return true;
       case "hybrid-object":
-        return true;
       case "promise":
-        return true;
       case "array-buffer":
-        return true;
       case "date":
-        return true;
       case "error":
-        return true;
       case "map":
-        return true;
       case "tuple":
         return true;
       default:
@@ -99,6 +89,16 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
         );
         break;
       }
+      case "variant": {
+        const variantType = getTypeAs(this.type, VariantType);
+        files.push(createRustVariant(variantType));
+        break;
+      }
+      case "function": {
+        const funcType = getTypeAs(this.type, FunctionType);
+        files.push(createRustFunction(funcType));
+        break;
+      }
     }
 
     // Recursively collect extra files from referenced types
@@ -114,8 +114,6 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
 
   /**
    * Returns the type as it appears at the FFI boundary.
-   * For C++, this is the C-compatible type used in `extern "C"` declarations.
-   * For Rust, this is the C-compatible type used in `extern "C" fn` declarations.
    */
   getTypeCode(language: "rust" | "c++"): string {
     switch (this.type.kind) {
@@ -140,25 +138,15 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "error":
         return language === "c++" ? "const char*" : "*const std::ffi::c_char";
       case "hybrid-object":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "array-buffer":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "array":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "optional":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "record":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "struct":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "variant":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "tuple":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "function":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "promise":
-        return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       case "map":
         return language === "c++" ? "void*" : "*mut std::ffi::c_void";
       default:
@@ -186,7 +174,6 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
 
   /**
    * Convert a value from C++ representation to Rust representation.
-   * The `inLanguage` parameter indicates which language the conversion code runs in.
    */
   parseFromCppToRust(
     parameterName: string,
@@ -231,6 +218,113 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
           default:
             return parameterName;
         }
+      case "array":
+        switch (inLanguage) {
+          case "rust":
+            // Reconstruct Vec from boxed raw pointer
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            // Box the vector and pass as void*
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "optional":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "struct":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(${parameterName}))`;
+          default:
+            return parameterName;
+        }
+      case "variant":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "tuple":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "record":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "function":
+        switch (inLanguage) {
+          case "rust":
+            // Reconstruct Box<dyn Fn> from void pointer
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            // Box the std::function and pass as void*
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "hybrid-object":
+        switch (inLanguage) {
+          case "rust":
+            // Opaque pointer to trait object — kept as-is
+            return parameterName;
+          case "c++":
+            // Extract raw pointer from shared_ptr
+            return `static_cast<void*>(${parameterName}.get())`;
+          default:
+            return parameterName;
+        }
+      case "promise":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "array-buffer":
+        switch (inLanguage) {
+          case "rust":
+            // Reconstruct Vec<u8> from void pointer
+            return `*Box::from_raw(${parameterName} as *mut Vec<u8>)`;
+          case "c++":
+            // Box the ArrayBuffer and pass as void*
+            return `static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
+      case "map":
+        switch (inLanguage) {
+          case "rust":
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
+          case "c++":
+            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          default:
+            return parameterName;
+        }
       case "void":
       case "null":
         return "";
@@ -241,7 +335,6 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
 
   /**
    * Convert a value from Rust representation to C++ representation.
-   * The `inLanguage` parameter indicates which language the conversion code runs in.
    */
   parseFromRustToCpp(
     parameterName: string,
@@ -281,6 +374,69 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
             return `std::ffi::CString::new(${parameterName}).unwrap().into_raw()`;
           case "c++":
             return `std::make_exception_ptr(std::runtime_error(${parameterName}))`;
+          default:
+            return parameterName;
+        }
+      case "array":
+      case "optional":
+      case "record":
+      case "tuple":
+      case "map":
+      case "promise":
+        switch (inLanguage) {
+          case "rust":
+            // Box the value and leak it as a void pointer
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
+          case "c++":
+            // Unbox: cast void* back to the C++ type and move out
+            return `std::move(*static_cast<${this.type.getCode("c++")}*>(${parameterName}))`;
+          default:
+            return parameterName;
+        }
+      case "struct":
+        switch (inLanguage) {
+          case "rust":
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
+          case "c++":
+            return `*static_cast<${this.type.getCode("c++")}*>(${parameterName})`;
+          default:
+            return parameterName;
+        }
+      case "variant":
+        switch (inLanguage) {
+          case "rust":
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
+          case "c++":
+            return `std::move(*static_cast<${this.type.getCode("c++")}*>(${parameterName}))`;
+          default:
+            return parameterName;
+        }
+      case "function":
+        switch (inLanguage) {
+          case "rust":
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
+          case "c++":
+            return `std::move(*static_cast<${this.type.getCode("c++")}*>(${parameterName}))`;
+          default:
+            return parameterName;
+        }
+      case "hybrid-object":
+        switch (inLanguage) {
+          case "rust":
+            // Opaque pointer — kept as-is
+            return parameterName;
+          case "c++":
+            // This would require reconstructing a shared_ptr — complex
+            return parameterName;
+          default:
+            return parameterName;
+        }
+      case "array-buffer":
+        switch (inLanguage) {
+          case "rust":
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
+          case "c++":
+            return `std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(${parameterName}))`;
           default:
             return parameterName;
         }
