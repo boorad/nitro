@@ -12,7 +12,7 @@
     clippy::all
 )]
 
-use super::Promise;
+use super::Promise::Promise;
 use super::WrappedJsStruct::WrappedJsStruct;
 use std::collections::HashMap;
 

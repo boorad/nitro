@@ -89,7 +89,7 @@ export class PromiseType implements Type {
         break;
       case "rust":
         imports.push({
-          name: "super::Promise",
+          name: "super::Promise::Promise",
           language: "rust",
           space: "system",
         });

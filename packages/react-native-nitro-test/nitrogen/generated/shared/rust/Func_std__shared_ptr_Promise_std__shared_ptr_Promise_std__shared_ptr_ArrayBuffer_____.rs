@@ -12,7 +12,7 @@
     clippy::all
 )]
 
-use super::Promise;
+use super::Promise::Promise;
 use std::ffi;
 
 /// FFI-safe wrapper for callback `Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____`.

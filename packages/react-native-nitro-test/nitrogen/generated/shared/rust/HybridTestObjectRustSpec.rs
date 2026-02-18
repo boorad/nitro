@@ -28,7 +28,7 @@ use super::OptionalWrapper::OptionalWrapper;
 use super::PartialPerson::PartialPerson;
 use super::Person::Person;
 use super::Powertrain::Powertrain;
-use super::Promise;
+use super::Promise::Promise;
 use super::StringOrExternal::StringOrExternal;
 use super::Variant_Box_dyn_HybridBaseSpec__OptionalWrapper::Variant_Box_dyn_HybridBaseSpec__OptionalWrapper;
 use super::Variant_Box_dyn_HybridTestObjectRustSpec__Person::Variant_Box_dyn_HybridTestObjectRustSpec__Person;

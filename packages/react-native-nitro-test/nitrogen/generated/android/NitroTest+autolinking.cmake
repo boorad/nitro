@@ -109,3 +109,14 @@ else()
         ReactAndroid::react_nativemodule_core     # <-- RN: TurboModules Core
     )
 endif()
+
+# Link the Rust static library.
+# The Rust library must be pre-built with `cargo build` for the target architecture.
+# Set NITRO_RUST_LIB_DIR to the directory containing the compiled Rust static library,
+# or it will default to the nitrogen/generated/shared/rust/target directory.
+if(NOT DEFINED NITRO_RUST_LIB_DIR)
+  set(NITRO_RUST_LIB_DIR "${CMAKE_SOURCE_DIR}/../nitrogen/generated/shared/rust/target/${ANDROID_ABI}")
+endif()
+add_library(NitroTest_rust STATIC IMPORTED)
+set_target_properties(NitroTest_rust PROPERTIES IMPORTED_LOCATION "${NITRO_RUST_LIB_DIR}/libNitroTest_rust.a")
+target_link_libraries(NitroTest NitroTest_rust)
