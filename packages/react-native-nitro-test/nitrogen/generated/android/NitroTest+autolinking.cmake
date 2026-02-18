@@ -110,13 +110,45 @@ else()
     )
 endif()
 
-# Link the Rust static library.
-# The Rust library must be pre-built with `cargo build` for the target architecture.
-# Set NITRO_RUST_LIB_DIR to the directory containing the compiled Rust static library,
-# or it will default to the nitrogen/generated/shared/rust/target directory.
+# Build and link the Rust static library.
+# cargo is invoked automatically during the build for the correct Android ABI.
+set(NITRO_RUST_SRC_DIR "${CMAKE_SOURCE_DIR}/../nitrogen/generated/shared/rust")
 if(NOT DEFINED NITRO_RUST_LIB_DIR)
-  set(NITRO_RUST_LIB_DIR "${CMAKE_SOURCE_DIR}/../nitrogen/generated/shared/rust/target/${ANDROID_ABI}")
+  set(NITRO_RUST_LIB_DIR "${NITRO_RUST_SRC_DIR}/target/${ANDROID_ABI}")
 endif()
+
+# Map Android ABI to Rust target triple
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+  set(RUST_TARGET "aarch64-linux-android")
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+  set(RUST_TARGET "armv7-linux-androideabi")
+elseif(ANDROID_ABI STREQUAL "x86_64")
+  set(RUST_TARGET "x86_64-linux-android")
+elseif(ANDROID_ABI STREQUAL "x86")
+  set(RUST_TARGET "i686-linux-android")
+endif()
+
+set(NITRO_RUST_LIB_OUTPUT "${NITRO_RUST_LIB_DIR}/libNitroTest_rust.a")
+
+add_custom_command(
+  OUTPUT ${NITRO_RUST_LIB_OUTPUT}
+  COMMAND ${CMAKE_COMMAND} -E env
+    "PATH=$ENV{HOME}/.cargo/bin:$ENV{PATH}"
+    "CARGO_TARGET_DIR=${NITRO_RUST_SRC_DIR}/target"
+    "CC=${CMAKE_C_COMPILER}"
+    "AR=${CMAKE_AR}"
+    "CARGO_TARGET_${RUST_TARGET}_LINKER=${CMAKE_C_COMPILER}"
+    cargo build --release --target ${RUST_TARGET}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${NITRO_RUST_LIB_DIR}
+  COMMAND ${CMAKE_COMMAND} -E copy
+    "${NITRO_RUST_SRC_DIR}/target/${RUST_TARGET}/release/libNitroTest_rust.a"
+    ${NITRO_RUST_LIB_OUTPUT}
+  WORKING_DIRECTORY ${NITRO_RUST_SRC_DIR}
+  COMMENT "Building Rust library for ${ANDROID_ABI} (${RUST_TARGET})"
+)
+add_custom_target(NitroTest_rust_build DEPENDS ${NITRO_RUST_LIB_OUTPUT})
+
 add_library(NitroTest_rust STATIC IMPORTED)
-set_target_properties(NitroTest_rust PROPERTIES IMPORTED_LOCATION "${NITRO_RUST_LIB_DIR}/libNitroTest_rust.a")
+set_target_properties(NitroTest_rust PROPERTIES IMPORTED_LOCATION ${NITRO_RUST_LIB_OUTPUT})
+add_dependencies(NitroTest_rust NitroTest_rust_build)
 target_link_libraries(NitroTest NitroTest_rust)

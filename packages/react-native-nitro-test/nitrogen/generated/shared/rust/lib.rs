@@ -32,6 +32,7 @@ pub mod HybridTestObjectRustSpec;
 pub mod JsStyleStruct;
 pub mod MapWrapper;
 pub mod NamedVariant;
+pub mod NitroBuffer;
 pub mod OldEnum;
 pub mod OptionalCallback;
 pub mod OptionalWrapper;
@@ -67,7 +68,4 @@ pub mod HybridSomeExternalObjectSpec {
 }
 pub mod HybridTestViewSpec {
     pub trait HybridTestViewSpec: Send + Sync {}
-}
-pub mod Promise {
-    pub struct Promise<T>(pub std::marker::PhantomData<T>);
 }

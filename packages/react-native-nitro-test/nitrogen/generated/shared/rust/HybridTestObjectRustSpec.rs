@@ -22,13 +22,13 @@ use super::HybridTestViewSpec::HybridTestViewSpec;
 use super::JsStyleStruct::JsStyleStruct;
 use super::MapWrapper::MapWrapper;
 use super::NamedVariant::NamedVariant;
+use super::NitroBuffer::NitroBuffer;
 use super::OldEnum::OldEnum;
 use super::OptionalCallback::OptionalCallback;
 use super::OptionalWrapper::OptionalWrapper;
 use super::PartialPerson::PartialPerson;
 use super::Person::Person;
 use super::Powertrain::Powertrain;
-use super::Promise::Promise;
 use super::StringOrExternal::StringOrExternal;
 use super::Variant_Box_dyn_HybridBaseSpec__OptionalWrapper::Variant_Box_dyn_HybridBaseSpec__OptionalWrapper;
 use super::Variant_Box_dyn_HybridTestObjectRustSpec__Person::Variant_Box_dyn_HybridTestObjectRustSpec__Person;
@@ -43,6 +43,19 @@ use super::WeirdNumbersEnum::WeirdNumbersEnum;
 use super::WrappedJsStruct::WrappedJsStruct;
 use std::collections::HashMap;
 
+/// Implement this trait to create a Rust-backed HybridObject for `TestObjectRust`.
+///
+/// After implementing, provide a factory function for registration:
+/// ```rust
+/// #[no_mangle]
+/// pub extern "C" fn create_HybridTestObjectRustSpec() -> *mut std::ffi::c_void {
+///     let obj: Box<dyn HybridTestObjectRustSpec> = Box::new(MyTestObjectRust::new());
+///     Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
+/// }
+/// ```
+///
+/// Note: The factory returns a `Box<Box<dyn HybridTestObjectRustSpec>>` (double-boxed)
+/// because the C++ bridge stores it as an opaque `void*` pointing to the trait object.
 pub trait HybridTestObjectRustSpec: Send + Sync {
     // Properties
     fn get_this_object(&self) -> Box<dyn HybridTestObjectRustSpec>;
@@ -108,8 +121,8 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
         &mut self,
         maps: Vec<HashMap<String, Box<dyn std::any::Any>>>,
     ) -> Vec<HashMap<String, Box<dyn std::any::Any>>>;
-    fn bounce_promises(&mut self, promises: Vec<Promise<f64>>) -> Vec<Promise<f64>>;
-    fn bounce_array_buffers(&mut self, array_buffers: Vec<Vec<u8>>) -> Vec<Vec<u8>>;
+    fn bounce_promises(&mut self, promises: Vec<f64>) -> Vec<f64>;
+    fn bounce_array_buffers(&mut self, array_buffers: Vec<NitroBuffer>) -> Vec<NitroBuffer>;
     fn create_map(&mut self) -> HashMap<String, Box<dyn std::any::Any>>;
     fn map_roundtrip(
         &mut self,
@@ -132,7 +145,7 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
     fn bounce_simple_map(&mut self, map: HashMap<String, f64>) -> HashMap<String, f64>;
     fn extract_map(&mut self, map_wrapper: MapWrapper) -> HashMap<String, String>;
     fn func_that_throws(&mut self) -> f64;
-    fn func_that_throws_before_promise(&mut self) -> Promise<()>;
+    fn func_that_throws_before_promise(&mut self);
     fn throw_error(&mut self, error: String);
     fn try_optional_params(&mut self, num: f64, boo: bool, str: Option<String>) -> String;
     fn try_middle_param(&mut self, num: f64, boo: Option<bool>, str: String) -> String;
@@ -141,36 +154,26 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
     fn add1_hour(&mut self, date: f64) -> f64;
     fn current_date(&mut self) -> f64;
     fn calculate_fibonacci_sync(&mut self, value: f64) -> i64;
-    fn calculate_fibonacci_async(&mut self, value: f64) -> Promise<i64>;
-    fn wait(&mut self, seconds: f64) -> Promise<()>;
-    fn promise_throws(&mut self) -> Promise<()>;
-    fn promise_returns_instantly(&mut self) -> Promise<f64>;
-    fn promise_returns_instantly_async(&mut self) -> Promise<f64>;
-    fn promise_that_resolves_void_instantly(&mut self) -> Promise<()>;
-    fn promise_that_resolves_to_undefined(&mut self) -> Promise<Option<f64>>;
-    fn await_and_get_promise(&mut self, promise: Promise<f64>) -> Promise<f64>;
-    fn await_and_get_complex_promise(&mut self, promise: Promise<Car>) -> Promise<Car>;
-    fn await_promise(&mut self, promise: Promise<()>) -> Promise<()>;
+    fn calculate_fibonacci_async(&mut self, value: f64) -> i64;
+    fn wait(&mut self, seconds: f64);
+    fn promise_throws(&mut self);
+    fn promise_returns_instantly(&mut self) -> f64;
+    fn promise_returns_instantly_async(&mut self) -> f64;
+    fn promise_that_resolves_void_instantly(&mut self);
+    fn promise_that_resolves_to_undefined(&mut self) -> Option<f64>;
+    fn await_and_get_promise(&mut self, promise: f64) -> f64;
+    fn await_and_get_complex_promise(&mut self, promise: Car) -> Car;
+    fn await_promise(&mut self, promise: ());
     fn call_callback(&mut self, callback: Box<dyn Fn()>);
-    fn call_callback_that_returns_promise_void(
-        &mut self,
-        callback: Box<dyn Fn() -> Promise<Promise<()>>>,
-    ) -> Promise<()>;
+    fn call_callback_that_returns_promise_void(&mut self, callback: Box<dyn Fn()>);
     fn call_all(&mut self, first: Box<dyn Fn()>, second: Box<dyn Fn()>, third: Box<dyn Fn()>);
     fn call_with_optional(&mut self, value: Option<f64>, callback: Box<dyn Fn(Option<f64>)>);
-    fn call_sum_up_n_times(
-        &mut self,
-        callback: Box<dyn Fn() -> Promise<f64>>,
-        n: f64,
-    ) -> Promise<f64>;
-    fn callback_async_promise(
-        &mut self,
-        callback: Box<dyn Fn() -> Promise<Promise<f64>>>,
-    ) -> Promise<f64>;
+    fn call_sum_up_n_times(&mut self, callback: Box<dyn Fn() -> f64>, n: f64) -> f64;
+    fn callback_async_promise(&mut self, callback: Box<dyn Fn() -> f64>) -> f64;
     fn callback_async_promise_buffer(
         &mut self,
-        callback: Box<dyn Fn() -> Promise<Promise<Vec<u8>>>>,
-    ) -> Promise<Vec<u8>>;
+        callback: Box<dyn Fn() -> NitroBuffer>,
+    ) -> NitroBuffer;
     fn get_complex_callback(&mut self) -> Box<dyn Fn(f64)>;
     fn two_optional_callbacks(
         &mut self,
@@ -183,15 +186,12 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
         &mut self,
         wrapping_js_callback: Box<dyn Fn(f64)>,
     ) -> Box<dyn Fn(f64)>;
-    fn get_value_from_j_s_callback_and_wait(
-        &mut self,
-        get_value: Box<dyn Fn() -> Promise<f64>>,
-    ) -> Promise<f64>;
+    fn get_value_from_j_s_callback_and_wait(&mut self, get_value: Box<dyn Fn() -> f64>) -> f64;
     fn get_value_from_js_callback(
         &mut self,
-        callback: Box<dyn Fn() -> Promise<String>>,
+        callback: Box<dyn Fn() -> String>,
         and_then_call: Box<dyn Fn(String)>,
-    ) -> Promise<()>;
+    );
     fn get_car(&mut self) -> Car;
     fn is_car_electric(&mut self, car: Car) -> bool;
     fn get_driver(&mut self, car: Car) -> Option<Person>;
@@ -200,13 +200,13 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
     fn bounce_wrapped_js_style_struct(&mut self, value: WrappedJsStruct) -> WrappedJsStruct;
     fn bounce_optional_wrapper(&mut self, wrapper: OptionalWrapper) -> OptionalWrapper;
     fn bounce_optional_callback(&mut self, value: OptionalCallback) -> OptionalCallback;
-    fn create_array_buffer(&mut self) -> Vec<u8>;
-    fn create_array_buffer_from_native_buffer(&mut self, copy: bool) -> Vec<u8>;
-    fn copy_buffer(&mut self, buffer: Vec<u8>) -> Vec<u8>;
-    fn get_buffer_last_item(&mut self, buffer: Vec<u8>) -> f64;
-    fn set_all_values_to(&mut self, buffer: Vec<u8>, value: f64);
-    fn create_array_buffer_async(&mut self) -> Promise<Vec<u8>>;
-    fn bounce_array_buffer(&mut self, buffer: Vec<u8>) -> Vec<u8>;
+    fn create_array_buffer(&mut self) -> NitroBuffer;
+    fn create_array_buffer_from_native_buffer(&mut self, copy: bool) -> NitroBuffer;
+    fn copy_buffer(&mut self, buffer: NitroBuffer) -> NitroBuffer;
+    fn get_buffer_last_item(&mut self, buffer: NitroBuffer) -> f64;
+    fn set_all_values_to(&mut self, buffer: NitroBuffer, value: f64);
+    fn create_array_buffer_async(&mut self) -> NitroBuffer;
+    fn bounce_array_buffer(&mut self, buffer: NitroBuffer) -> NitroBuffer;
     fn pass_variant(
         &mut self,
         either: Variant_bool_Vec_f64__Vec_String__String_f64,
@@ -246,6 +246,12 @@ pub trait HybridTestObjectRustSpec: Send + Sync {
         &mut self,
         factory: Box<dyn Fn() -> Box<dyn HybridSomeExternalObjectSpec>>,
     ) -> Box<dyn HybridSomeExternalObjectSpec>;
+
+    /// Return the size of any external heap allocations, in bytes.
+    /// This is used to inform the JavaScript GC about native memory pressure.
+    fn memory_size(&self) -> usize {
+        0
+    }
 }
 
 // FFI shims for C++ bridge
@@ -664,7 +670,15 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_complex_enum_callback(
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
     let __array = *Box::from_raw(array as *mut Vec<Powertrain>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn(Vec<Powertrain>)>);
+    let __callback = {
+        let __wrapper = Box::from_raw(
+            callback
+                as *mut super::Func_void_std__vector_Powertrain_::Func_void_std__vector_Powertrain_,
+        );
+        let __cb: Box<dyn Fn(Vec<Powertrain>)> =
+            Box::new(move |__p0: Vec<Powertrain>| unsafe { __wrapper.call(__p0) });
+        __cb
+    };
     obj.complex_enum_callback(__array, __callback)
 }
 
@@ -707,7 +721,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_bounce_promises(
     promises: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __promises = *Box::from_raw(promises as *mut Vec<Promise<f64>>);
+    let __promises = *Box::from_raw(promises as *mut Vec<f64>);
     let __result = obj.bounce_promises(__promises);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -718,7 +732,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_bounce_array_buffers(
     array_buffers: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __array_buffers = *Box::from_raw(array_buffers as *mut Vec<Vec<u8>>);
+    let __array_buffers = *Box::from_raw(array_buffers as *mut Vec<NitroBuffer>);
     let __result = obj.bounce_array_buffers(__array_buffers);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -822,10 +836,9 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_func_that_throws(
 #[no_mangle]
 pub unsafe extern "C" fn HybridTestObjectRustSpec_func_that_throws_before_promise(
     ptr: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.func_that_throws_before_promise();
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.func_that_throws_before_promise()
 }
 
 #[no_mangle]
@@ -922,56 +935,45 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_calculate_fibonacci_sync(
 pub unsafe extern "C" fn HybridTestObjectRustSpec_calculate_fibonacci_async(
     ptr: *mut std::ffi::c_void,
     value: f64,
-) -> *mut std::ffi::c_void {
+) -> i64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.calculate_fibonacci_async(value);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.calculate_fibonacci_async(value)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn HybridTestObjectRustSpec_wait(
-    ptr: *mut std::ffi::c_void,
-    seconds: f64,
-) -> *mut std::ffi::c_void {
+pub unsafe extern "C" fn HybridTestObjectRustSpec_wait(ptr: *mut std::ffi::c_void, seconds: f64) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.wait(seconds);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.wait(seconds)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_throws(
-    ptr: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_throws(ptr: *mut std::ffi::c_void) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.promise_throws();
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.promise_throws()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_returns_instantly(
     ptr: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.promise_returns_instantly();
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.promise_returns_instantly()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_returns_instantly_async(
     ptr: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.promise_returns_instantly_async();
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.promise_returns_instantly_async()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_that_resolves_void_instantly(
     ptr: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __result = obj.promise_that_resolves_void_instantly();
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    obj.promise_that_resolves_void_instantly()
 }
 
 #[no_mangle]
@@ -987,11 +989,10 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_promise_that_resolves_to_undef
 pub unsafe extern "C" fn HybridTestObjectRustSpec_await_and_get_promise(
     ptr: *mut std::ffi::c_void,
     promise: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __promise = *Box::from_raw(promise as *mut Promise<f64>);
-    let __result = obj.await_and_get_promise(__promise);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __promise = *Box::from_raw(promise as *mut f64);
+    obj.await_and_get_promise(__promise)
 }
 
 #[no_mangle]
@@ -1000,7 +1001,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_await_and_get_complex_promise(
     promise: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __promise = *Box::from_raw(promise as *mut Promise<Car>);
+    let __promise = *Box::from_raw(promise as *mut Car);
     let __result = obj.await_and_get_complex_promise(__promise);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -1009,11 +1010,10 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_await_and_get_complex_promise(
 pub unsafe extern "C" fn HybridTestObjectRustSpec_await_promise(
     ptr: *mut std::ffi::c_void,
     promise: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __promise = *Box::from_raw(promise as *mut Promise<()>);
-    let __result = obj.await_promise(__promise);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __promise = *Box::from_raw(promise as *mut ());
+    obj.await_promise(__promise)
 }
 
 #[no_mangle]
@@ -1022,7 +1022,11 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_call_callback(
     callback: *mut std::ffi::c_void,
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn()>);
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_void::Func_void);
+        let __cb: Box<dyn Fn()> = Box::new(move || unsafe { __wrapper.call() });
+        __cb
+    };
     obj.call_callback(__callback)
 }
 
@@ -1030,11 +1034,14 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_call_callback(
 pub unsafe extern "C" fn HybridTestObjectRustSpec_call_callback_that_returns_promise_void(
     ptr: *mut std::ffi::c_void,
     callback: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> Promise<Promise<()>>>);
-    let __result = obj.call_callback_that_returns_promise_void(__callback);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_void____::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_void____);
+        let __cb: Box<dyn Fn()> = Box::new(move || unsafe { __wrapper.call() });
+        __cb
+    };
+    obj.call_callback_that_returns_promise_void(__callback)
 }
 
 #[no_mangle]
@@ -1045,9 +1052,21 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_call_all(
     third: *mut std::ffi::c_void,
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __first = *Box::from_raw(first as *mut Box<dyn Fn()>);
-    let __second = *Box::from_raw(second as *mut Box<dyn Fn()>);
-    let __third = *Box::from_raw(third as *mut Box<dyn Fn()>);
+    let __first = {
+        let __wrapper = Box::from_raw(first as *mut super::Func_void::Func_void);
+        let __cb: Box<dyn Fn()> = Box::new(move || unsafe { __wrapper.call() });
+        __cb
+    };
+    let __second = {
+        let __wrapper = Box::from_raw(second as *mut super::Func_void::Func_void);
+        let __cb: Box<dyn Fn()> = Box::new(move || unsafe { __wrapper.call() });
+        __cb
+    };
+    let __third = {
+        let __wrapper = Box::from_raw(third as *mut super::Func_void::Func_void);
+        let __cb: Box<dyn Fn()> = Box::new(move || unsafe { __wrapper.call() });
+        __cb
+    };
     obj.call_all(__first, __second, __third)
 }
 
@@ -1059,7 +1078,15 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_call_with_optional(
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
     let __value = *Box::from_raw(value as *mut Option<f64>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn(Option<f64>)>);
+    let __callback = {
+        let __wrapper = Box::from_raw(
+            callback
+                as *mut super::Func_void_std__optional_double_::Func_void_std__optional_double_,
+        );
+        let __cb: Box<dyn Fn(Option<f64>)> =
+            Box::new(move |__p0: Option<f64>| unsafe { __wrapper.call(__p0) });
+        __cb
+    };
     obj.call_with_optional(__value, __callback)
 }
 
@@ -1068,22 +1095,28 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_call_sum_up_n_times(
     ptr: *mut std::ffi::c_void,
     callback: *mut std::ffi::c_void,
     n: f64,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> Promise<f64>>);
-    let __result = obj.call_sum_up_n_times(__callback, n);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_std__shared_ptr_Promise_double__::Func_std__shared_ptr_Promise_double__);
+        let __cb: Box<dyn Fn() -> f64> = Box::new(move || -> f64 { unsafe { __wrapper.call() } });
+        __cb
+    };
+    obj.call_sum_up_n_times(__callback, n)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn HybridTestObjectRustSpec_callback_async_promise(
     ptr: *mut std::ffi::c_void,
     callback: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> Promise<Promise<f64>>>);
-    let __result = obj.callback_async_promise(__callback);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_double____::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_double____);
+        let __cb: Box<dyn Fn() -> f64> = Box::new(move || -> f64 { unsafe { __wrapper.call() } });
+        __cb
+    };
+    obj.callback_async_promise(__callback)
 }
 
 #[no_mangle]
@@ -1092,7 +1125,12 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_callback_async_promise_buffer(
     callback: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> Promise<Promise<Vec<u8>>>>);
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____::Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____);
+        let __cb: Box<dyn Fn() -> NitroBuffer> =
+            Box::new(move || -> NitroBuffer { unsafe { __wrapper.call() } });
+        __cb
+    };
     let __result = obj.callback_async_promise_buffer(__callback);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -1125,7 +1163,14 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_error_callback(
     on_error: *mut std::ffi::c_void,
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __on_error = *Box::from_raw(on_error as *mut Box<dyn Fn(String)>);
+    let __on_error = {
+        let __wrapper = Box::from_raw(
+            on_error as *mut super::Func_void_std__exception_ptr::Func_void_std__exception_ptr,
+        );
+        let __cb: Box<dyn Fn(String)> =
+            Box::new(move |__p0: String| unsafe { __wrapper.call(__p0) });
+        __cb
+    };
     obj.error_callback(__on_error)
 }
 
@@ -1135,7 +1180,12 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_create_native_callback(
     wrapping_js_callback: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __wrapping_js_callback = *Box::from_raw(wrapping_js_callback as *mut Box<dyn Fn(f64)>);
+    let __wrapping_js_callback = {
+        let __wrapper =
+            Box::from_raw(wrapping_js_callback as *mut super::Func_void_double::Func_void_double);
+        let __cb: Box<dyn Fn(f64)> = Box::new(move |__p0: f64| unsafe { __wrapper.call(__p0) });
+        __cb
+    };
     let __result = obj.create_native_callback(__wrapping_js_callback);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -1144,11 +1194,14 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_create_native_callback(
 pub unsafe extern "C" fn HybridTestObjectRustSpec_get_value_from_j_s_callback_and_wait(
     ptr: *mut std::ffi::c_void,
     get_value: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __get_value = *Box::from_raw(get_value as *mut Box<dyn Fn() -> Promise<f64>>);
-    let __result = obj.get_value_from_j_s_callback_and_wait(__get_value);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __get_value = {
+        let __wrapper = Box::from_raw(get_value as *mut super::Func_std__shared_ptr_Promise_double__::Func_std__shared_ptr_Promise_double__);
+        let __cb: Box<dyn Fn() -> f64> = Box::new(move || -> f64 { unsafe { __wrapper.call() } });
+        __cb
+    };
+    obj.get_value_from_j_s_callback_and_wait(__get_value)
 }
 
 #[no_mangle]
@@ -1156,12 +1209,23 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_get_value_from_js_callback(
     ptr: *mut std::ffi::c_void,
     callback: *mut std::ffi::c_void,
     and_then_call: *mut std::ffi::c_void,
-) -> *mut std::ffi::c_void {
+) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> Promise<String>>);
-    let __and_then_call = *Box::from_raw(and_then_call as *mut Box<dyn Fn(String)>);
-    let __result = obj.get_value_from_js_callback(__callback, __and_then_call);
-    Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_std__shared_ptr_Promise_std__string__::Func_std__shared_ptr_Promise_std__string__);
+        let __cb: Box<dyn Fn() -> String> =
+            Box::new(move || -> String { unsafe { __wrapper.call() } });
+        __cb
+    };
+    let __and_then_call = {
+        let __wrapper = Box::from_raw(
+            and_then_call as *mut super::Func_void_std__string::Func_void_std__string,
+        );
+        let __cb: Box<dyn Fn(String)> =
+            Box::new(move |__p0: String| unsafe { __wrapper.call(__p0) });
+        __cb
+    };
+    obj.get_value_from_js_callback(__callback, __and_then_call)
 }
 
 #[no_mangle]
@@ -1273,7 +1337,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_copy_buffer(
     buffer: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __buffer = *Box::from_raw(buffer as *mut Vec<u8>);
+    let __buffer = *Box::from_raw(buffer as *mut super::NitroBuffer::NitroBuffer);
     let __result = obj.copy_buffer(__buffer);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -1284,7 +1348,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_get_buffer_last_item(
     buffer: *mut std::ffi::c_void,
 ) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __buffer = *Box::from_raw(buffer as *mut Vec<u8>);
+    let __buffer = *Box::from_raw(buffer as *mut super::NitroBuffer::NitroBuffer);
     obj.get_buffer_last_item(__buffer)
 }
 
@@ -1295,7 +1359,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_set_all_values_to(
     value: f64,
 ) {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __buffer = *Box::from_raw(buffer as *mut Vec<u8>);
+    let __buffer = *Box::from_raw(buffer as *mut super::NitroBuffer::NitroBuffer);
     obj.set_all_values_to(__buffer, value)
 }
 
@@ -1314,7 +1378,7 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_bounce_array_buffer(
     buffer: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __buffer = *Box::from_raw(buffer as *mut Vec<u8>);
+    let __buffer = *Box::from_raw(buffer as *mut super::NitroBuffer::NitroBuffer);
     let __result = obj.bounce_array_buffer(__buffer);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
 }
@@ -1473,7 +1537,11 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_callback_sync(
     callback: *mut std::ffi::c_void,
 ) -> f64 {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __callback = *Box::from_raw(callback as *mut Box<dyn Fn() -> f64>);
+    let __callback = {
+        let __wrapper = Box::from_raw(callback as *mut super::Func_double::Func_double);
+        let __cb: Box<dyn Fn() -> f64> = Box::new(move || -> f64 { unsafe { __wrapper.call() } });
+        __cb
+    };
     obj.callback_sync(__callback)
 }
 
@@ -1536,10 +1604,22 @@ pub unsafe extern "C" fn HybridTestObjectRustSpec_create_external_variant_from_f
     factory: *mut std::ffi::c_void,
 ) -> *mut std::ffi::c_void {
     let obj = &mut *(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
-    let __factory =
-        *Box::from_raw(factory as *mut Box<dyn Fn() -> Box<dyn HybridSomeExternalObjectSpec>>);
+    let __factory = {
+        let __wrapper = Box::from_raw(factory as *mut super::Func_std__shared_ptr_margelo__nitro__test__external__HybridSomeExternalObjectSpec_::Func_std__shared_ptr_margelo__nitro__test__external__HybridSomeExternalObjectSpec_);
+        let __cb: Box<dyn Fn() -> Box<dyn HybridSomeExternalObjectSpec>> =
+            Box::new(move || -> Box<dyn HybridSomeExternalObjectSpec> {
+                unsafe { __wrapper.call() }
+            });
+        __cb
+    };
     let __result = obj.create_external_variant_from_func(__factory);
     Box::into_raw(Box::new(__result)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn HybridTestObjectRustSpec_memory_size(ptr: *mut std::ffi::c_void) -> usize {
+    let obj = &*(ptr as *mut Box<dyn HybridTestObjectRustSpec>);
+    obj.memory_size()
 }
 
 #[no_mangle]

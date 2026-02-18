@@ -23,6 +23,7 @@ use std::ffi;
 pub struct Func_void_std__optional_double_ {
     fn_ptr: unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void),
     userdata: *mut std::ffi::c_void,
+    destroy_fn: unsafe extern "C" fn(*mut std::ffi::c_void),
 }
 
 // Safety: The C++ side guarantees the function pointer and userdata
@@ -31,12 +32,17 @@ unsafe impl Send for Func_void_std__optional_double_ {}
 unsafe impl Sync for Func_void_std__optional_double_ {}
 
 impl Func_void_std__optional_double_ {
-    /// Create a new wrapper from a C function pointer and userdata.
+    /// Create a new wrapper from a C function pointer, userdata, and destroy function.
     pub fn new(
         fn_ptr: unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void),
         userdata: *mut ffi::c_void,
+        destroy_fn: unsafe extern "C" fn(*mut ffi::c_void),
     ) -> Self {
-        Self { fn_ptr, userdata }
+        Self {
+            fn_ptr,
+            userdata,
+            destroy_fn,
+        }
     }
 
     /// Call the wrapped function.
@@ -45,5 +51,13 @@ impl Func_void_std__optional_double_ {
             self.userdata,
             Box::into_raw(Box::new(maybe)) as *mut std::ffi::c_void,
         );
+    }
+}
+
+impl Drop for Func_void_std__optional_double_ {
+    fn drop(&mut self) {
+        unsafe {
+            (self.destroy_fn)(self.userdata);
+        }
     }
 }

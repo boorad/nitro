@@ -101,7 +101,7 @@ extern "C" {
   void* HybridTestObjectRustSpec_bounce_simple_map(void* rustPtr, void* map);
   void* HybridTestObjectRustSpec_extract_map(void* rustPtr, void* mapWrapper);
   double HybridTestObjectRustSpec_func_that_throws(void* rustPtr);
-  void* HybridTestObjectRustSpec_func_that_throws_before_promise(void* rustPtr);
+  void HybridTestObjectRustSpec_func_that_throws_before_promise(void* rustPtr);
   void HybridTestObjectRustSpec_throw_error(void* rustPtr, const char* error);
   const char* HybridTestObjectRustSpec_try_optional_params(void* rustPtr, double num, bool boo, void* str);
   const char* HybridTestObjectRustSpec_try_middle_param(void* rustPtr, double num, void* boo, const char* str);
@@ -110,29 +110,29 @@ extern "C" {
   double HybridTestObjectRustSpec_add1_hour(void* rustPtr, double date);
   double HybridTestObjectRustSpec_current_date(void* rustPtr);
   int64_t HybridTestObjectRustSpec_calculate_fibonacci_sync(void* rustPtr, double value);
-  void* HybridTestObjectRustSpec_calculate_fibonacci_async(void* rustPtr, double value);
-  void* HybridTestObjectRustSpec_wait(void* rustPtr, double seconds);
-  void* HybridTestObjectRustSpec_promise_throws(void* rustPtr);
-  void* HybridTestObjectRustSpec_promise_returns_instantly(void* rustPtr);
-  void* HybridTestObjectRustSpec_promise_returns_instantly_async(void* rustPtr);
-  void* HybridTestObjectRustSpec_promise_that_resolves_void_instantly(void* rustPtr);
+  int64_t HybridTestObjectRustSpec_calculate_fibonacci_async(void* rustPtr, double value);
+  void HybridTestObjectRustSpec_wait(void* rustPtr, double seconds);
+  void HybridTestObjectRustSpec_promise_throws(void* rustPtr);
+  double HybridTestObjectRustSpec_promise_returns_instantly(void* rustPtr);
+  double HybridTestObjectRustSpec_promise_returns_instantly_async(void* rustPtr);
+  void HybridTestObjectRustSpec_promise_that_resolves_void_instantly(void* rustPtr);
   void* HybridTestObjectRustSpec_promise_that_resolves_to_undefined(void* rustPtr);
-  void* HybridTestObjectRustSpec_await_and_get_promise(void* rustPtr, void* promise);
+  double HybridTestObjectRustSpec_await_and_get_promise(void* rustPtr, void* promise);
   void* HybridTestObjectRustSpec_await_and_get_complex_promise(void* rustPtr, void* promise);
-  void* HybridTestObjectRustSpec_await_promise(void* rustPtr, void* promise);
+  void HybridTestObjectRustSpec_await_promise(void* rustPtr, void* promise);
   void HybridTestObjectRustSpec_call_callback(void* rustPtr, void* callback);
-  void* HybridTestObjectRustSpec_call_callback_that_returns_promise_void(void* rustPtr, void* callback);
+  void HybridTestObjectRustSpec_call_callback_that_returns_promise_void(void* rustPtr, void* callback);
   void HybridTestObjectRustSpec_call_all(void* rustPtr, void* first, void* second, void* third);
   void HybridTestObjectRustSpec_call_with_optional(void* rustPtr, void* value, void* callback);
-  void* HybridTestObjectRustSpec_call_sum_up_n_times(void* rustPtr, void* callback, double n);
-  void* HybridTestObjectRustSpec_callback_async_promise(void* rustPtr, void* callback);
+  double HybridTestObjectRustSpec_call_sum_up_n_times(void* rustPtr, void* callback, double n);
+  double HybridTestObjectRustSpec_callback_async_promise(void* rustPtr, void* callback);
   void* HybridTestObjectRustSpec_callback_async_promise_buffer(void* rustPtr, void* callback);
   void* HybridTestObjectRustSpec_get_complex_callback(void* rustPtr);
   void HybridTestObjectRustSpec_two_optional_callbacks(void* rustPtr, double value, void* first, void* second);
   void HybridTestObjectRustSpec_error_callback(void* rustPtr, void* onError);
   void* HybridTestObjectRustSpec_create_native_callback(void* rustPtr, void* wrappingJsCallback);
-  void* HybridTestObjectRustSpec_get_value_from_j_s_callback_and_wait(void* rustPtr, void* getValue);
-  void* HybridTestObjectRustSpec_get_value_from_js_callback(void* rustPtr, void* callback, void* andThenCall);
+  double HybridTestObjectRustSpec_get_value_from_j_s_callback_and_wait(void* rustPtr, void* getValue);
+  void HybridTestObjectRustSpec_get_value_from_js_callback(void* rustPtr, void* callback, void* andThenCall);
   void* HybridTestObjectRustSpec_get_car(void* rustPtr);
   bool HybridTestObjectRustSpec_is_car_electric(void* rustPtr, void* car);
   void* HybridTestObjectRustSpec_get_driver(void* rustPtr, void* car);
@@ -169,6 +169,7 @@ extern "C" {
   void* HybridTestObjectRustSpec_bounce_external_struct(void* rustPtr, void* externalStruct);
   void* HybridTestObjectRustSpec_bounce_external_variant(void* rustPtr, void* variant);
   void* HybridTestObjectRustSpec_create_external_variant_from_func(void* rustPtr, void* factory);
+  size_t HybridTestObjectRustSpec_memory_size(void* rustPtr);
   void HybridTestObjectRustSpec_destroy(void* rustPtr);
 }
 
@@ -236,7 +237,7 @@ namespace margelo::nitro::test {
     inline PartialPerson bouncePartialStruct(const PartialPerson& person) override { auto __result = HybridTestObjectRustSpec_bounce_partial_struct(_rustPtr, static_cast<void*>(new PartialPerson(person))); return *static_cast<PartialPerson*>(__result); }
     inline std::string sumUpAllPassengers(const std::vector<Car>& cars) override { auto __result = HybridTestObjectRustSpec_sum_up_all_passengers(_rustPtr, static_cast<void*>(new std::vector<Car>(std::move(cars)))); return std::string(__result); }
     inline std::vector<Powertrain> bounceEnums(const std::vector<Powertrain>& array) override { auto __result = HybridTestObjectRustSpec_bounce_enums(_rustPtr, static_cast<void*>(new std::vector<Powertrain>(std::move(array)))); return std::move(*static_cast<std::vector<Powertrain>*>(__result)); }
-    inline void complexEnumCallback(const std::vector<Powertrain>& array, const std::function<void(const std::vector<Powertrain>& /* array */)>& callback) override { HybridTestObjectRustSpec_complex_enum_callback(_rustPtr, static_cast<void*>(new std::vector<Powertrain>(std::move(array))), static_cast<void*>(new std::function<void(const std::vector<Powertrain>& /* array */)>(std::move(callback)))); }
+    inline void complexEnumCallback(const std::vector<Powertrain>& array, const std::function<void(const std::vector<Powertrain>& /* array */)>& callback) override { HybridTestObjectRustSpec_complex_enum_callback(_rustPtr, static_cast<void*>(new std::vector<Powertrain>(std::move(array))), [&]() -> void* { struct __W { void(*fn_ptr)(void*, void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud, void* __a0) { (*static_cast<std::function<void(const std::vector<Powertrain>& /* array */)>*>(__ud))(std::move(*static_cast<std::vector<Powertrain>*>(__a0))); }, static_cast<void*>(new std::function<void(const std::vector<Powertrain>& /* array */)>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<void(const std::vector<Powertrain>& /* array */)>*>(__ud); } }); }()); }
     inline std::vector<std::shared_ptr<HybridChildSpec>> bounceHybridObjects(const std::vector<std::shared_ptr<HybridChildSpec>>& array) override { auto __result = HybridTestObjectRustSpec_bounce_hybrid_objects(_rustPtr, static_cast<void*>(new std::vector<std::shared_ptr<HybridChildSpec>>(std::move(array)))); return std::move(*static_cast<std::vector<std::shared_ptr<HybridChildSpec>>*>(__result)); }
     inline std::vector<std::function<void()>> bounceFunctions(const std::vector<std::function<void()>>& functions) override { auto __result = HybridTestObjectRustSpec_bounce_functions(_rustPtr, static_cast<void*>(new std::vector<std::function<void()>>(std::move(functions)))); return std::move(*static_cast<std::vector<std::function<void()>>*>(__result)); }
     inline std::vector<std::shared_ptr<AnyMap>> bounceMaps(const std::vector<std::shared_ptr<AnyMap>>& maps) override { auto __result = HybridTestObjectRustSpec_bounce_maps(_rustPtr, static_cast<void*>(new std::vector<std::shared_ptr<AnyMap>>(std::move(maps)))); return std::move(*static_cast<std::vector<std::shared_ptr<AnyMap>>*>(__result)); }
@@ -251,7 +252,11 @@ namespace margelo::nitro::test {
     inline std::unordered_map<std::string, double> bounceSimpleMap(const std::unordered_map<std::string, double>& map) override { auto __result = HybridTestObjectRustSpec_bounce_simple_map(_rustPtr, static_cast<void*>(new std::unordered_map<std::string, double>(std::move(map)))); return std::move(*static_cast<std::unordered_map<std::string, double>*>(__result)); }
     inline std::unordered_map<std::string, std::string> extractMap(const MapWrapper& mapWrapper) override { auto __result = HybridTestObjectRustSpec_extract_map(_rustPtr, static_cast<void*>(new MapWrapper(mapWrapper))); return std::move(*static_cast<std::unordered_map<std::string, std::string>*>(__result)); }
     inline double funcThatThrows() override { return HybridTestObjectRustSpec_func_that_throws(_rustPtr); }
-    inline std::shared_ptr<Promise<void>> funcThatThrowsBeforePromise() override { auto __result = HybridTestObjectRustSpec_func_that_throws_before_promise(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
+    inline std::shared_ptr<Promise<void>> funcThatThrowsBeforePromise() override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_func_that_throws_before_promise(_rustPtr);
+          });
+        }
     inline void throwError(const std::exception_ptr& error) override { HybridTestObjectRustSpec_throw_error(_rustPtr, [&]() -> const char* { try { std::rethrow_exception(error); } catch (const std::exception& e) { return e.what(); } catch (...) { return "unknown error"; } }()); }
     inline std::string tryOptionalParams(double num, bool boo, const std::optional<std::string>& str) override { auto __result = HybridTestObjectRustSpec_try_optional_params(_rustPtr, num, boo, static_cast<void*>(new std::optional<std::string>(std::move(str)))); return std::string(__result); }
     inline std::string tryMiddleParam(double num, std::optional<bool> boo, const std::string& str) override { auto __result = HybridTestObjectRustSpec_try_middle_param(_rustPtr, num, static_cast<void*>(new std::optional<bool>(std::move(boo))), str.c_str()); return std::string(__result); }
@@ -260,29 +265,96 @@ namespace margelo::nitro::test {
     inline std::chrono::system_clock::time_point add1Hour(std::chrono::system_clock::time_point date) override { auto __result = HybridTestObjectRustSpec_add1_hour(_rustPtr, std::chrono::duration<double, std::milli>(date.time_since_epoch()).count()); return std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::duration<double, std::milli>(__result))); }
     inline std::chrono::system_clock::time_point currentDate() override { auto __result = HybridTestObjectRustSpec_current_date(_rustPtr); return std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::duration<double, std::milli>(__result))); }
     inline int64_t calculateFibonacciSync(double value) override { return HybridTestObjectRustSpec_calculate_fibonacci_sync(_rustPtr, value); }
-    inline std::shared_ptr<Promise<int64_t>> calculateFibonacciAsync(double value) override { auto __result = HybridTestObjectRustSpec_calculate_fibonacci_async(_rustPtr, value); return std::move(*static_cast<std::shared_ptr<Promise<int64_t>>*>(__result)); }
-    inline std::shared_ptr<Promise<void>> wait(double seconds) override { auto __result = HybridTestObjectRustSpec_wait(_rustPtr, seconds); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
-    inline std::shared_ptr<Promise<void>> promiseThrows() override { auto __result = HybridTestObjectRustSpec_promise_throws(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
-    inline std::shared_ptr<Promise<double>> promiseReturnsInstantly() override { auto __result = HybridTestObjectRustSpec_promise_returns_instantly(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<double>> promiseReturnsInstantlyAsync() override { auto __result = HybridTestObjectRustSpec_promise_returns_instantly_async(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<void>> promiseThatResolvesVoidInstantly() override { auto __result = HybridTestObjectRustSpec_promise_that_resolves_void_instantly(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
-    inline std::shared_ptr<Promise<std::optional<double>>> promiseThatResolvesToUndefined() override { auto __result = HybridTestObjectRustSpec_promise_that_resolves_to_undefined(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<std::optional<double>>>*>(__result)); }
-    inline std::shared_ptr<Promise<double>> awaitAndGetPromise(const std::shared_ptr<Promise<double>>& promise) override { auto __result = HybridTestObjectRustSpec_await_and_get_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<double>>(std::move(promise)))); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<Car>> awaitAndGetComplexPromise(const std::shared_ptr<Promise<Car>>& promise) override { auto __result = HybridTestObjectRustSpec_await_and_get_complex_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<Car>>(std::move(promise)))); return std::move(*static_cast<std::shared_ptr<Promise<Car>>*>(__result)); }
-    inline std::shared_ptr<Promise<void>> awaitPromise(const std::shared_ptr<Promise<void>>& promise) override { auto __result = HybridTestObjectRustSpec_await_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<void>>(std::move(promise)))); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
-    inline void callCallback(const std::function<void()>& callback) override { HybridTestObjectRustSpec_call_callback(_rustPtr, static_cast<void*>(new std::function<void()>(std::move(callback)))); }
-    inline std::shared_ptr<Promise<void>> callCallbackThatReturnsPromiseVoid(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>& callback) override { auto __result = HybridTestObjectRustSpec_call_callback_that_returns_promise_void(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>(std::move(callback)))); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
-    inline void callAll(const std::function<void()>& first, const std::function<void()>& second, const std::function<void()>& third) override { HybridTestObjectRustSpec_call_all(_rustPtr, static_cast<void*>(new std::function<void()>(std::move(first))), static_cast<void*>(new std::function<void()>(std::move(second))), static_cast<void*>(new std::function<void()>(std::move(third)))); }
-    inline void callWithOptional(std::optional<double> value, const std::function<void(std::optional<double> /* maybe */)>& callback) override { HybridTestObjectRustSpec_call_with_optional(_rustPtr, static_cast<void*>(new std::optional<double>(std::move(value))), static_cast<void*>(new std::function<void(std::optional<double> /* maybe */)>(std::move(callback)))); }
-    inline std::shared_ptr<Promise<double>> callSumUpNTimes(const std::function<std::shared_ptr<Promise<double>>()>& callback, double n) override { auto __result = HybridTestObjectRustSpec_call_sum_up_n_times(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<double>>()>(std::move(callback))), n); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<double>> callbackAsyncPromise(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>& callback) override { auto __result = HybridTestObjectRustSpec_callback_async_promise(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>(std::move(callback)))); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> callbackAsyncPromiseBuffer(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>& callback) override { auto __result = HybridTestObjectRustSpec_callback_async_promise_buffer(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>(std::move(callback)))); return std::move(*static_cast<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>*>(__result)); }
+    inline std::shared_ptr<Promise<int64_t>> calculateFibonacciAsync(double value) override {
+          return Promise<int64_t>::async([=]() -> int64_t {
+            return HybridTestObjectRustSpec_calculate_fibonacci_async(_rustPtr, value);
+          });
+        }
+    inline std::shared_ptr<Promise<void>> wait(double seconds) override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_wait(_rustPtr, seconds);
+          });
+        }
+    inline std::shared_ptr<Promise<void>> promiseThrows() override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_promise_throws(_rustPtr);
+          });
+        }
+    inline std::shared_ptr<Promise<double>> promiseReturnsInstantly() override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_promise_returns_instantly(_rustPtr);
+          });
+        }
+    inline std::shared_ptr<Promise<double>> promiseReturnsInstantlyAsync() override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_promise_returns_instantly_async(_rustPtr);
+          });
+        }
+    inline std::shared_ptr<Promise<void>> promiseThatResolvesVoidInstantly() override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_promise_that_resolves_void_instantly(_rustPtr);
+          });
+        }
+    inline std::shared_ptr<Promise<std::optional<double>>> promiseThatResolvesToUndefined() override {
+          return Promise<std::optional<double>>::async([=]() -> std::optional<double> {
+            auto __result = HybridTestObjectRustSpec_promise_that_resolves_to_undefined(_rustPtr);
+            return std::move(*static_cast<std::optional<double>*>(__result));
+          });
+        }
+    inline std::shared_ptr<Promise<double>> awaitAndGetPromise(const std::shared_ptr<Promise<double>>& promise) override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_await_and_get_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<double>>(std::move(promise))));
+          });
+        }
+    inline std::shared_ptr<Promise<Car>> awaitAndGetComplexPromise(const std::shared_ptr<Promise<Car>>& promise) override {
+          return Promise<Car>::async([=]() -> Car {
+            auto __result = HybridTestObjectRustSpec_await_and_get_complex_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<Car>>(std::move(promise))));
+            return *static_cast<Car*>(__result);
+          });
+        }
+    inline std::shared_ptr<Promise<void>> awaitPromise(const std::shared_ptr<Promise<void>>& promise) override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_await_promise(_rustPtr, static_cast<void*>(new std::shared_ptr<Promise<void>>(std::move(promise))));
+          });
+        }
+    inline void callCallback(const std::function<void()>& callback) override { HybridTestObjectRustSpec_call_callback(_rustPtr, [&]() -> void* { struct __W { void(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) { (*static_cast<std::function<void()>*>(__ud))(); }, static_cast<void*>(new std::function<void()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<void()>*>(__ud); } }); }()); }
+    inline std::shared_ptr<Promise<void>> callCallbackThatReturnsPromiseVoid(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>& callback) override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_call_callback_that_returns_promise_void(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<void>>>>()>*>(__ud); } }); }());
+          });
+        }
+    inline void callAll(const std::function<void()>& first, const std::function<void()>& second, const std::function<void()>& third) override { HybridTestObjectRustSpec_call_all(_rustPtr, [&]() -> void* { struct __W { void(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) { (*static_cast<std::function<void()>*>(__ud))(); }, static_cast<void*>(new std::function<void()>(std::move(first))), [](void* __ud) { delete static_cast<std::function<void()>*>(__ud); } }); }(), [&]() -> void* { struct __W { void(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) { (*static_cast<std::function<void()>*>(__ud))(); }, static_cast<void*>(new std::function<void()>(std::move(second))), [](void* __ud) { delete static_cast<std::function<void()>*>(__ud); } }); }(), [&]() -> void* { struct __W { void(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) { (*static_cast<std::function<void()>*>(__ud))(); }, static_cast<void*>(new std::function<void()>(std::move(third))), [](void* __ud) { delete static_cast<std::function<void()>*>(__ud); } }); }()); }
+    inline void callWithOptional(std::optional<double> value, const std::function<void(std::optional<double> /* maybe */)>& callback) override { HybridTestObjectRustSpec_call_with_optional(_rustPtr, static_cast<void*>(new std::optional<double>(std::move(value))), [&]() -> void* { struct __W { void(*fn_ptr)(void*, void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud, void* __a0) { (*static_cast<std::function<void(std::optional<double> /* maybe */)>*>(__ud))(std::move(*static_cast<std::optional<double>*>(__a0))); }, static_cast<void*>(new std::function<void(std::optional<double> /* maybe */)>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<void(std::optional<double> /* maybe */)>*>(__ud); } }); }()); }
+    inline std::shared_ptr<Promise<double>> callSumUpNTimes(const std::function<std::shared_ptr<Promise<double>>()>& callback, double n) override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_call_sum_up_n_times(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<double>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<double>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<double>>()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<double>>()>*>(__ud); } }); }(), n);
+          });
+        }
+    inline std::shared_ptr<Promise<double>> callbackAsyncPromise(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>& callback) override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_callback_async_promise(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<double>>>>()>*>(__ud); } }); }());
+          });
+        }
+    inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> callbackAsyncPromiseBuffer(const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>& callback) override {
+          return Promise<std::shared_ptr<ArrayBuffer>>::async([=]() -> std::shared_ptr<ArrayBuffer> {
+            auto __result = HybridTestObjectRustSpec_callback_async_promise_buffer(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>()>*>(__ud); } }); }());
+            return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }();
+          });
+        }
     inline std::function<void(double /* value */)> getComplexCallback() override { auto __result = HybridTestObjectRustSpec_get_complex_callback(_rustPtr); return std::move(*static_cast<std::function<void(double /* value */)>*>(__result)); }
     inline void twoOptionalCallbacks(double value, const std::optional<std::function<void(double /* value */)>>& first, const std::optional<std::function<void(const std::string& /* value */)>>& second) override { HybridTestObjectRustSpec_two_optional_callbacks(_rustPtr, value, static_cast<void*>(new std::optional<std::function<void(double /* value */)>>(std::move(first))), static_cast<void*>(new std::optional<std::function<void(const std::string& /* value */)>>(std::move(second)))); }
-    inline void errorCallback(const std::function<void(const std::exception_ptr& /* error */)>& onError) override { HybridTestObjectRustSpec_error_callback(_rustPtr, static_cast<void*>(new std::function<void(const std::exception_ptr& /* error */)>(std::move(onError)))); }
-    inline std::function<void(double /* num */)> createNativeCallback(const std::function<void(double /* num */)>& wrappingJsCallback) override { auto __result = HybridTestObjectRustSpec_create_native_callback(_rustPtr, static_cast<void*>(new std::function<void(double /* num */)>(std::move(wrappingJsCallback)))); return std::move(*static_cast<std::function<void(double /* num */)>*>(__result)); }
-    inline std::shared_ptr<Promise<double>> getValueFromJSCallbackAndWait(const std::function<std::shared_ptr<Promise<double>>()>& getValue) override { auto __result = HybridTestObjectRustSpec_get_value_from_j_s_callback_and_wait(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<double>>()>(std::move(getValue)))); return std::move(*static_cast<std::shared_ptr<Promise<double>>*>(__result)); }
-    inline std::shared_ptr<Promise<void>> getValueFromJsCallback(const std::function<std::shared_ptr<Promise<std::string>>()>& callback, const std::function<void(const std::string& /* valueFromJs */)>& andThenCall) override { auto __result = HybridTestObjectRustSpec_get_value_from_js_callback(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::string>>()>(std::move(callback))), static_cast<void*>(new std::function<void(const std::string& /* valueFromJs */)>(std::move(andThenCall)))); return std::move(*static_cast<std::shared_ptr<Promise<void>>*>(__result)); }
+    inline void errorCallback(const std::function<void(const std::exception_ptr& /* error */)>& onError) override { HybridTestObjectRustSpec_error_callback(_rustPtr, [&]() -> void* { struct __W { void(*fn_ptr)(void*, const char*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud, const char* __a0) { (*static_cast<std::function<void(const std::exception_ptr& /* error */)>*>(__ud))(std::make_exception_ptr(std::runtime_error(__a0))); }, static_cast<void*>(new std::function<void(const std::exception_ptr& /* error */)>(std::move(onError))), [](void* __ud) { delete static_cast<std::function<void(const std::exception_ptr& /* error */)>*>(__ud); } }); }()); }
+    inline std::function<void(double /* num */)> createNativeCallback(const std::function<void(double /* num */)>& wrappingJsCallback) override { auto __result = HybridTestObjectRustSpec_create_native_callback(_rustPtr, [&]() -> void* { struct __W { void(*fn_ptr)(void*, double); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud, double __a0) { (*static_cast<std::function<void(double /* num */)>*>(__ud))(__a0); }, static_cast<void*>(new std::function<void(double /* num */)>(std::move(wrappingJsCallback))), [](void* __ud) { delete static_cast<std::function<void(double /* num */)>*>(__ud); } }); }()); return std::move(*static_cast<std::function<void(double /* num */)>*>(__result)); }
+    inline std::shared_ptr<Promise<double>> getValueFromJSCallbackAndWait(const std::function<std::shared_ptr<Promise<double>>()>& getValue) override {
+          return Promise<double>::async([=]() -> double {
+            return HybridTestObjectRustSpec_get_value_from_j_s_callback_and_wait(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<double>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<double>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<double>>()>(std::move(getValue))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<double>>()>*>(__ud); } }); }());
+          });
+        }
+    inline std::shared_ptr<Promise<void>> getValueFromJsCallback(const std::function<std::shared_ptr<Promise<std::string>>()>& callback, const std::function<void(const std::string& /* valueFromJs */)>& andThenCall) override {
+          return Promise<void>::async([=]() {
+            HybridTestObjectRustSpec_get_value_from_js_callback(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<Promise<std::string>>()>*>(__ud))(); return static_cast<void*>(new std::shared_ptr<Promise<std::string>>(std::move(__r))); }, static_cast<void*>(new std::function<std::shared_ptr<Promise<std::string>>()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<Promise<std::string>>()>*>(__ud); } }); }(), [&]() -> void* { struct __W { void(*fn_ptr)(void*, const char*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud, const char* __a0) { (*static_cast<std::function<void(const std::string& /* valueFromJs */)>*>(__ud))(std::string(__a0)); }, static_cast<void*>(new std::function<void(const std::string& /* valueFromJs */)>(std::move(andThenCall))), [](void* __ud) { delete static_cast<std::function<void(const std::string& /* valueFromJs */)>*>(__ud); } }); }());
+          });
+        }
     inline Car getCar() override { auto __result = HybridTestObjectRustSpec_get_car(_rustPtr); return *static_cast<Car*>(__result); }
     inline bool isCarElectric(const Car& car) override { return HybridTestObjectRustSpec_is_car_electric(_rustPtr, static_cast<void*>(new Car(car))); }
     inline std::optional<Person> getDriver(const Car& car) override { auto __result = HybridTestObjectRustSpec_get_driver(_rustPtr, static_cast<void*>(new Car(car))); return std::move(*static_cast<std::optional<Person>*>(__result)); }
@@ -291,13 +363,18 @@ namespace margelo::nitro::test {
     inline WrappedJsStruct bounceWrappedJsStyleStruct(const WrappedJsStruct& value) override { auto __result = HybridTestObjectRustSpec_bounce_wrapped_js_style_struct(_rustPtr, static_cast<void*>(new WrappedJsStruct(value))); return *static_cast<WrappedJsStruct*>(__result); }
     inline OptionalWrapper bounceOptionalWrapper(const OptionalWrapper& wrapper) override { auto __result = HybridTestObjectRustSpec_bounce_optional_wrapper(_rustPtr, static_cast<void*>(new OptionalWrapper(wrapper))); return *static_cast<OptionalWrapper*>(__result); }
     inline OptionalCallback bounceOptionalCallback(const OptionalCallback& value) override { auto __result = HybridTestObjectRustSpec_bounce_optional_callback(_rustPtr, static_cast<void*>(new OptionalCallback(value))); return *static_cast<OptionalCallback*>(__result); }
-    inline std::shared_ptr<ArrayBuffer> createArrayBuffer() override { auto __result = HybridTestObjectRustSpec_create_array_buffer(_rustPtr); return std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(__result)); }
-    inline std::shared_ptr<ArrayBuffer> createArrayBufferFromNativeBuffer(bool copy) override { auto __result = HybridTestObjectRustSpec_create_array_buffer_from_native_buffer(_rustPtr, copy); return std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(__result)); }
-    inline std::shared_ptr<ArrayBuffer> copyBuffer(const std::shared_ptr<ArrayBuffer>& buffer) override { auto __result = HybridTestObjectRustSpec_copy_buffer(_rustPtr, static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(buffer)))); return std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(__result)); }
-    inline double getBufferLastItem(const std::shared_ptr<ArrayBuffer>& buffer) override { return HybridTestObjectRustSpec_get_buffer_last_item(_rustPtr, static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(buffer)))); }
-    inline void setAllValuesTo(const std::shared_ptr<ArrayBuffer>& buffer, double value) override { HybridTestObjectRustSpec_set_all_values_to(_rustPtr, static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(buffer))), value); }
-    inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> createArrayBufferAsync() override { auto __result = HybridTestObjectRustSpec_create_array_buffer_async(_rustPtr); return std::move(*static_cast<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>*>(__result)); }
-    inline std::shared_ptr<ArrayBuffer> bounceArrayBuffer(const std::shared_ptr<ArrayBuffer>& buffer) override { auto __result = HybridTestObjectRustSpec_bounce_array_buffer(_rustPtr, static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(buffer)))); return std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(__result)); }
+    inline std::shared_ptr<ArrayBuffer> createArrayBuffer() override { auto __result = HybridTestObjectRustSpec_create_array_buffer(_rustPtr); return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }(); }
+    inline std::shared_ptr<ArrayBuffer> createArrayBufferFromNativeBuffer(bool copy) override { auto __result = HybridTestObjectRustSpec_create_array_buffer_from_native_buffer(_rustPtr, copy); return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }(); }
+    inline std::shared_ptr<ArrayBuffer> copyBuffer(const std::shared_ptr<ArrayBuffer>& buffer) override { auto __result = HybridTestObjectRustSpec_copy_buffer(_rustPtr, [&]() -> void* { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __sp = new std::shared_ptr<ArrayBuffer>(std::move(buffer)); return static_cast<void*>(new __NB { (*__sp)->data(), (*__sp)->size(), static_cast<void*>(__sp), [](void* __h) { delete static_cast<std::shared_ptr<ArrayBuffer>*>(__h); } }); }()); return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }(); }
+    inline double getBufferLastItem(const std::shared_ptr<ArrayBuffer>& buffer) override { return HybridTestObjectRustSpec_get_buffer_last_item(_rustPtr, [&]() -> void* { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __sp = new std::shared_ptr<ArrayBuffer>(std::move(buffer)); return static_cast<void*>(new __NB { (*__sp)->data(), (*__sp)->size(), static_cast<void*>(__sp), [](void* __h) { delete static_cast<std::shared_ptr<ArrayBuffer>*>(__h); } }); }()); }
+    inline void setAllValuesTo(const std::shared_ptr<ArrayBuffer>& buffer, double value) override { HybridTestObjectRustSpec_set_all_values_to(_rustPtr, [&]() -> void* { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __sp = new std::shared_ptr<ArrayBuffer>(std::move(buffer)); return static_cast<void*>(new __NB { (*__sp)->data(), (*__sp)->size(), static_cast<void*>(__sp), [](void* __h) { delete static_cast<std::shared_ptr<ArrayBuffer>*>(__h); } }); }(), value); }
+    inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> createArrayBufferAsync() override {
+          return Promise<std::shared_ptr<ArrayBuffer>>::async([=]() -> std::shared_ptr<ArrayBuffer> {
+            auto __result = HybridTestObjectRustSpec_create_array_buffer_async(_rustPtr);
+            return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }();
+          });
+        }
+    inline std::shared_ptr<ArrayBuffer> bounceArrayBuffer(const std::shared_ptr<ArrayBuffer>& buffer) override { auto __result = HybridTestObjectRustSpec_bounce_array_buffer(_rustPtr, [&]() -> void* { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __sp = new std::shared_ptr<ArrayBuffer>(std::move(buffer)); return static_cast<void*>(new __NB { (*__sp)->data(), (*__sp)->size(), static_cast<void*>(__sp), [](void* __h) { delete static_cast<std::shared_ptr<ArrayBuffer>*>(__h); } }); }()); return [&]() -> std::shared_ptr<ArrayBuffer> { struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; auto __nb = static_cast<__NB*>(__result); auto __data = __nb->data; auto __len = __nb->len; auto __handle = __nb->handle; auto __release = __nb->release_fn; delete __nb; return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); }(); }
     inline std::variant<std::string, double> passVariant(const std::variant<bool, std::vector<double>, std::vector<std::string>, std::string, double>& either) override { auto __result = HybridTestObjectRustSpec_pass_variant(_rustPtr, static_cast<void*>(new std::variant<bool, std::vector<double>, std::vector<std::string>, std::string, double>(std::move(either)))); return std::move(*static_cast<std::variant<std::string, double>*>(__result)); }
     inline std::variant<bool, OldEnum> getVariantEnum(const std::variant<bool, OldEnum>& variant) override { auto __result = HybridTestObjectRustSpec_get_variant_enum(_rustPtr, static_cast<void*>(new std::variant<bool, OldEnum>(std::move(variant)))); return std::move(*static_cast<std::variant<bool, OldEnum>*>(__result)); }
     inline std::variant<bool, WeirdNumbersEnum> getVariantWeirdNumbersEnum(const std::variant<bool, WeirdNumbersEnum>& variant) override { auto __result = HybridTestObjectRustSpec_get_variant_weird_numbers_enum(_rustPtr, static_cast<void*>(new std::variant<bool, WeirdNumbersEnum>(std::move(variant)))); return std::move(*static_cast<std::variant<bool, WeirdNumbersEnum>*>(__result)); }
@@ -312,13 +389,18 @@ namespace margelo::nitro::test {
     inline std::shared_ptr<HybridBaseSpec> bounceBase(const std::shared_ptr<HybridBaseSpec>& base) override { auto __result = HybridTestObjectRustSpec_bounce_base(_rustPtr, static_cast<void*>(base.get())); return __result; }
     inline std::shared_ptr<HybridBaseSpec> bounceChildBase(const std::shared_ptr<HybridChildSpec>& child) override { auto __result = HybridTestObjectRustSpec_bounce_child_base(_rustPtr, static_cast<void*>(child.get())); return __result; }
     inline std::shared_ptr<HybridChildSpec> castBase(const std::shared_ptr<HybridBaseSpec>& base) override { auto __result = HybridTestObjectRustSpec_cast_base(_rustPtr, static_cast<void*>(base.get())); return __result; }
-    inline double callbackSync(const std::function<double()>& callback) override { return HybridTestObjectRustSpec_callback_sync(_rustPtr, static_cast<void*>(new std::function<double()>(std::move(callback)))); }
+    inline double callbackSync(const std::function<double()>& callback) override { return HybridTestObjectRustSpec_callback_sync(_rustPtr, [&]() -> void* { struct __W { double(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> double { return (*static_cast<std::function<double()>*>(__ud))(); }, static_cast<void*>(new std::function<double()>(std::move(callback))), [](void* __ud) { delete static_cast<std::function<double()>*>(__ud); } }); }()); }
     inline bool getIsViewBlue(const std::shared_ptr<HybridTestViewSpec>& view) override { return HybridTestObjectRustSpec_get_is_view_blue(_rustPtr, static_cast<void*>(view.get())); }
     inline std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec> bounceExternalHybrid(const std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>& externalObject) override { auto __result = HybridTestObjectRustSpec_bounce_external_hybrid(_rustPtr, static_cast<void*>(externalObject.get())); return __result; }
     inline std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec> createInternalObject() override { auto __result = HybridTestObjectRustSpec_create_internal_object(_rustPtr); return __result; }
     inline ExternalObjectStruct bounceExternalStruct(const ExternalObjectStruct& externalStruct) override { auto __result = HybridTestObjectRustSpec_bounce_external_struct(_rustPtr, static_cast<void*>(new ExternalObjectStruct(externalStruct))); return *static_cast<ExternalObjectStruct*>(__result); }
     inline std::variant<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>, std::string> bounceExternalVariant(const std::variant<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>, std::string>& variant) override { auto __result = HybridTestObjectRustSpec_bounce_external_variant(_rustPtr, static_cast<void*>(new std::variant<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>, std::string>(std::move(variant)))); return std::move(*static_cast<std::variant<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>, std::string>*>(__result)); }
-    inline std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec> createExternalVariantFromFunc(const std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>& factory) override { auto __result = HybridTestObjectRustSpec_create_external_variant_from_func(_rustPtr, static_cast<void*>(new std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>(std::move(factory)))); return __result; }
+    inline std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec> createExternalVariantFromFunc(const std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>& factory) override { auto __result = HybridTestObjectRustSpec_create_external_variant_from_func(_rustPtr, [&]() -> void* { struct __W { void*(*fn_ptr)(void*); void* userdata; void(*destroy_fn)(void*); }; return static_cast<void*>(new __W { [](void* __ud) -> void* { auto __r = (*static_cast<std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>*>(__ud))(); return static_cast<void*>(__r.get()); }, static_cast<void*>(new std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>(std::move(factory))), [](void* __ud) { delete static_cast<std::function<std::shared_ptr<margelo::nitro::test::external::HybridSomeExternalObjectSpec>()>*>(__ud); } }); }()); return __result; }
+
+  public:
+    inline size_t getExternalMemorySize() noexcept override {
+      return HybridTestObjectRustSpec_memory_size(_rustPtr);
+    }
 
   private:
     void* _rustPtr;

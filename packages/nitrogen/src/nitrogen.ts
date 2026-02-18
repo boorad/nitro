@@ -26,6 +26,7 @@ import type { Autolinking } from "./autolinking/Autolinking.js";
 import {
   createRustLibRs,
   createRustCargoToml,
+  createRustNitroBuffer,
 } from "./autolinking/rust/createRustAutolinking.js";
 import { createGitAttributes } from "./createGitAttributes.js";
 import type { PlatformSpec } from "react-native-nitro-modules";
@@ -200,6 +201,17 @@ export async function runNitrogen({
   const rustFiles = writtenFiles.filter((f) => f.language === "rust");
   if (rustFiles.length > 0) {
     Logger.info(`🦀  Generating Rust crate files...`);
+    // Generate NitroBuffer.rs (zero-copy ArrayBuffer type) and write it first
+    // so it's included in lib.rs module declarations
+    const nitroBuffer = createRustNitroBuffer();
+    const nitroBufferPath = path.join(
+      outputDirectory,
+      nitroBuffer.platform,
+      nitroBuffer.language,
+    );
+    const nitroBufferActual = await writeFile(nitroBufferPath, nitroBuffer);
+    filesAfter.push(nitroBufferActual);
+    rustFiles.push(nitroBuffer);
     const libRs = createRustLibRs(rustFiles);
     const cargoToml = createRustCargoToml();
     for (const file of [libRs, cargoToml]) {

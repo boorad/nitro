@@ -10,6 +10,8 @@ import type { HybridObjectSpec } from "../HybridObjectSpec.js";
 import { includeHeader } from "../c++/includeNitroHeader.js";
 import { getHybridObjectName } from "../getHybridObjectName.js";
 import { RustCxxBridgedType } from "./RustCxxBridgedType.js";
+import { PromiseType } from "../types/PromiseType.js";
+import { getTypeAs } from "../types/getTypeAs.js";
 
 /**
  * Creates the Rust trait definition and FFI shim functions for a HybridObject,
@@ -110,7 +112,13 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_set_${rustPropName}(ptr: *mut std::
   // Method shims
   for (const method of spec.methods) {
     const rustMethodName = toSnakeCase(method.name);
-    const returnBridged = new RustCxxBridgedType(method.returnType);
+    // For Promise-returning methods, the Rust side returns the inner type synchronously.
+    // The C++ bridge wraps the call in Promise<T>::async().
+    const effectiveReturnType =
+      method.returnType.kind === "promise"
+        ? getTypeAs(method.returnType, PromiseType).resultingType
+        : method.returnType;
+    const returnBridged = new RustCxxBridgedType(effectiveReturnType);
     const ffiReturnType = returnBridged.getRustFfiType();
     const ffiReturnSuffix =
       ffiReturnType === "()" ? "" : ` -> ${ffiReturnType}`;
@@ -175,6 +183,17 @@ ${body}
     );
   }
 
+  // Memory size shim (for GC pressure reporting)
+  shims.push(
+    `
+#[no_mangle]
+pub unsafe extern "C" fn ${name.HybridTSpec}_memory_size(ptr: *mut std::ffi::c_void) -> usize {
+    let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+    obj.memory_size()
+}
+  `.trim(),
+  );
+
   // Destroy shim (for C++ destructor to call)
   shims.push(
     `
@@ -204,12 +223,29 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_destroy(ptr: *mut std::ffi::c_void)
   const code = `
 ${createRustFileMetadataString(`${name.HybridTSpec}.rs`)}
 ${importsBlock}
+/// Implement this trait to create a Rust-backed HybridObject for \`${spec.name}\`.
+///
+/// After implementing, provide a factory function for registration:
+/// \`\`\`rust
+/// #[no_mangle]
+/// pub extern "C" fn create_${name.HybridTSpec}() -> *mut std::ffi::c_void {
+///     let obj: Box<dyn ${name.HybridTSpec}> = Box::new(My${spec.name}::new());
+///     Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
+/// }
+/// \`\`\`
+///
+/// Note: The factory returns a \`Box<Box<dyn ${name.HybridTSpec}>>\` (double-boxed)
+/// because the C++ bridge stores it as an opaque \`void*\` pointing to the trait object.
 pub trait ${name.HybridTSpec}: Send + Sync {
     // Properties
     ${indent(properties, "    ")}
 
     // Methods
     ${indent(methods, "    ")}
+
+    /// Return the size of any external heap allocations, in bytes.
+    /// This is used to inform the JavaScript GC about native memory pressure.
+    fn memory_size(&self) -> usize { 0 }
 }
 
 // FFI shims for C++ bridge
@@ -250,7 +286,12 @@ function createCppRustBridgeHeader(spec: HybridObjectSpec): SourceFile {
 
   for (const method of spec.methods) {
     const rustMethodName = toSnakeCase(method.name);
-    const returnBridged = new RustCxxBridgedType(method.returnType);
+    // For Promise-returning methods, the FFI function returns the inner type
+    const effectiveReturnType =
+      method.returnType.kind === "promise"
+        ? getTypeAs(method.returnType, PromiseType).resultingType
+        : method.returnType;
+    const returnBridged = new RustCxxBridgedType(effectiveReturnType);
     const ffiReturnType = returnBridged.getCppFfiType();
     const params = method.parameters
       .map((p) => {
@@ -264,6 +305,7 @@ function createCppRustBridgeHeader(spec: HybridObjectSpec): SourceFile {
     );
   }
 
+  externDecls.push(`size_t ${name.HybridTSpec}_memory_size(void* rustPtr);`);
   externDecls.push(`void ${name.HybridTSpec}_destroy(void* rustPtr);`);
 
   // Property implementations (getter/setter overrides) with type conversion
@@ -309,8 +351,14 @@ function createCppRustBridgeHeader(spec: HybridObjectSpec): SourceFile {
   for (const method of spec.methods) {
     const rustMethodName = toSnakeCase(method.name);
     const returnType = method.returnType.getCode("c++");
-    const returnBridged = new RustCxxBridgedType(method.returnType);
-    const hasReturn = method.returnType.kind !== "void";
+    const isPromise = method.returnType.kind === "promise";
+
+    // For Promise-returning methods, get the inner type for FFI
+    const effectiveReturnType = isPromise
+      ? getTypeAs(method.returnType, PromiseType).resultingType
+      : method.returnType;
+    const returnBridged = new RustCxxBridgedType(effectiveReturnType);
+    const hasReturn = effectiveReturnType.kind !== "void";
 
     // C++ method params use native C++ types
     const params = method.parameters
@@ -335,7 +383,40 @@ function createCppRustBridgeHeader(spec: HybridObjectSpec): SourceFile {
 
     const ffiCall = `${name.HybridTSpec}_${rustMethodName}(_rustPtr${ffiArgsWithComma})`;
 
-    if (hasReturn && returnBridged.needsSpecialHandling) {
+    if (isPromise) {
+      // Promise-returning methods: wrap the synchronous FFI call in Promise<T>::async()
+      const innerCppType = effectiveReturnType.getCode("c++");
+      if (hasReturn) {
+        if (returnBridged.needsSpecialHandling) {
+          const converted = returnBridged.parseFromRustToCpp("__result", "c++");
+          methodImpls.push(
+            `inline ${returnType} ${method.name}(${params}) override {\n` +
+              `      return Promise<${innerCppType}>::async([=]() -> ${innerCppType} {\n` +
+              `        auto __result = ${ffiCall};\n` +
+              `        return ${converted};\n` +
+              `      });\n` +
+              `    }`,
+          );
+        } else {
+          methodImpls.push(
+            `inline ${returnType} ${method.name}(${params}) override {\n` +
+              `      return Promise<${innerCppType}>::async([=]() -> ${innerCppType} {\n` +
+              `        return ${ffiCall};\n` +
+              `      });\n` +
+              `    }`,
+          );
+        }
+      } else {
+        // Promise<void>
+        methodImpls.push(
+          `inline ${returnType} ${method.name}(${params}) override {\n` +
+            `      return Promise<void>::async([=]() {\n` +
+            `        ${ffiCall};\n` +
+            `      });\n` +
+            `    }`,
+        );
+      }
+    } else if (hasReturn && returnBridged.needsSpecialHandling) {
       const converted = returnBridged.parseFromRustToCpp("__result", "c++");
       methodImpls.push(
         `inline ${returnType} ${method.name}(${params}) override { auto __result = ${ffiCall}; return ${converted}; }`,
@@ -392,6 +473,11 @@ namespace ${cxxNamespace} {
   public:
     // Methods
     ${indent(methodImpls.join("\n"), "    ")}
+
+  public:
+    inline size_t getExternalMemorySize() noexcept override {
+      return ${name.HybridTSpec}_memory_size(_rustPtr);
+    }
 
   private:
     void* _rustPtr;

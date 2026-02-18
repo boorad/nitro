@@ -52,7 +52,9 @@ export class PromiseType implements Type {
       case "kotlin":
         return `Promise<${resultingCode}>`;
       case "rust":
-        return `Promise<${resultingCode}>`;
+        // For Rust, Promises are unwrapped: the Rust trait returns the inner type
+        // synchronously, and the C++ bridge wraps the call in Promise<T>::async().
+        return resultingCode;
       default:
         throw new Error(
           `Language ${language} is not yet supported for PromiseType!`,
@@ -88,11 +90,8 @@ export class PromiseType implements Type {
         });
         break;
       case "rust":
-        imports.push({
-          name: "super::Promise::Promise",
-          language: "rust",
-          space: "system",
-        });
+        // No Promise import needed for Rust — the trait returns the inner type
+        // directly, and the C++ bridge handles Promise wrapping.
         break;
     }
     return imports;

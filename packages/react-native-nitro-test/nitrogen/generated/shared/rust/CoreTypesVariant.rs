@@ -12,16 +12,16 @@
     clippy::all
 )]
 
-use super::Promise::Promise;
+use super::NitroBuffer::NitroBuffer;
 use super::WrappedJsStruct::WrappedJsStruct;
 use std::collections::HashMap;
 
 /// Tagged union `CoreTypesVariant` — auto-generated from TypeScript.
 pub enum CoreTypesVariant {
-    First(Vec<u8>),
+    First(NitroBuffer),
     Second(Box<dyn Fn(f64)>),
     Third(WrappedJsStruct),
-    Fourth(Promise<f64>),
+    Fourth(f64),
     Fifth(f64),
     Sixth(HashMap<String, Box<dyn std::any::Any>>),
 }

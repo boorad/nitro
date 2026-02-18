@@ -39,7 +39,10 @@ export function createRustFunction(funcType: FunctionType): SourceFile {
     rustReturnType === "()" ? "" : ` -> ${rustReturnType}`;
 
   // Build the wrapper struct
-  const wrapperFields = `    fn_ptr: ${cFnType},\n    userdata: *mut std::ffi::c_void,`;
+  const wrapperFields =
+    `    fn_ptr: ${cFnType},\n` +
+    `    userdata: *mut std::ffi::c_void,\n` +
+    `    destroy_fn: unsafe extern "C" fn(*mut std::ffi::c_void),`;
 
   // Build the call() implementation
   const callFfiArgs = funcType.parameters.map((p) => {
@@ -101,14 +104,20 @@ unsafe impl Send for ${name} {}
 unsafe impl Sync for ${name} {}
 
 impl ${name} {
-    /// Create a new wrapper from a C function pointer and userdata.
-    pub fn new(fn_ptr: ${cFnType}, userdata: *mut ffi::c_void) -> Self {
-        Self { fn_ptr, userdata }
+    /// Create a new wrapper from a C function pointer, userdata, and destroy function.
+    pub fn new(fn_ptr: ${cFnType}, userdata: *mut ffi::c_void, destroy_fn: unsafe extern "C" fn(*mut ffi::c_void)) -> Self {
+        Self { fn_ptr, userdata, destroy_fn }
     }
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, ${callParams})${rustReturnSuffix} {
 ${callBody}
+    }
+}
+
+impl Drop for ${name} {
+    fn drop(&mut self) {
+        unsafe { (self.destroy_fn)(self.userdata); }
     }
 }
 `.trim();

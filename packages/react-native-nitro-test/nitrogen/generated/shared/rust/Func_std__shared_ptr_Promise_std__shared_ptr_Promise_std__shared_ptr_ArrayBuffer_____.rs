@@ -12,7 +12,7 @@
     clippy::all
 )]
 
-use super::Promise::Promise;
+use super::NitroBuffer::NitroBuffer;
 use std::ffi;
 
 /// FFI-safe wrapper for callback `Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____`.
@@ -24,6 +24,7 @@ use std::ffi;
 pub struct Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____ {
     fn_ptr: unsafe extern "C" fn(*mut std::ffi::c_void) -> *mut std::ffi::c_void,
     userdata: *mut std::ffi::c_void,
+    destroy_fn: unsafe extern "C" fn(*mut std::ffi::c_void),
 }
 
 // Safety: The C++ side guarantees the function pointer and userdata
@@ -38,17 +39,32 @@ unsafe impl Sync
 }
 
 impl Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____ {
-    /// Create a new wrapper from a C function pointer and userdata.
+    /// Create a new wrapper from a C function pointer, userdata, and destroy function.
     pub fn new(
         fn_ptr: unsafe extern "C" fn(*mut std::ffi::c_void) -> *mut std::ffi::c_void,
         userdata: *mut ffi::c_void,
+        destroy_fn: unsafe extern "C" fn(*mut ffi::c_void),
     ) -> Self {
-        Self { fn_ptr, userdata }
+        Self {
+            fn_ptr,
+            userdata,
+            destroy_fn,
+        }
     }
 
     /// Call the wrapped function.
-    pub unsafe fn call(&self) -> Promise<Promise<Vec<u8>>> {
+    pub unsafe fn call(&self) -> NitroBuffer {
         let __result = (self.fn_ptr)(self.userdata);
-        *Box::from_raw(__result as *mut Promise<Promise<Vec<u8>>>)
+        *Box::from_raw(__result as *mut NitroBuffer)
+    }
+}
+
+impl Drop
+    for Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer_____
+{
+    fn drop(&mut self) {
+        unsafe {
+            (self.destroy_fn)(self.userdata);
+        }
     }
 }

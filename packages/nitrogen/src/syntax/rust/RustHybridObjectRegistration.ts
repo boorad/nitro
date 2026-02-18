@@ -36,7 +36,13 @@ export function createRustHybridObjectRegistration({
       { name: `${HybridTSpecRust}.hpp`, language: "c++", space: "user" },
     ],
     cppCode: `
-// Rust factory function - must be provided by the user's Rust implementation ("${rustClassName}").
+// Rust factory function — provided by the user's Rust implementation ("${rustClassName}").
+// The Rust side must define:
+//   #[no_mangle]
+//   pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
+//       let obj: Box<dyn ${HybridTSpec}> = Box::new(${rustClassName}::new());
+//       Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
+//   }
 extern "C" void* ${factoryFunctionName}();
 HybridObjectRegistry::registerHybridObjectConstructor(
   "${hybridObjectName}",

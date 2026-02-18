@@ -11,6 +11,10 @@ import { VoidType } from "../syntax/types/VoidType.js";
 import { ArrayType } from "../syntax/types/ArrayType.js";
 import { OptionalType } from "../syntax/types/OptionalType.js";
 import { DateType } from "../syntax/types/DateType.js";
+import { PromiseType } from "../syntax/types/PromiseType.js";
+import { FunctionType } from "../syntax/types/FunctionType.js";
+import { NamedWrappingType } from "../syntax/types/NamedWrappingType.js";
+import { createRustFunction } from "../syntax/rust/RustFunction.js";
 import type { HybridObjectSpec } from "../syntax/HybridObjectSpec.js";
 
 // Create a mock NitroConfig for testing
@@ -470,6 +474,187 @@ describe("Rust HybridObject Generator", () => {
       expect(hpp.content).toContain(
         "double HybridImageSpec_get_created_at(void* rustPtr)",
       );
+    });
+  });
+
+  describe("memory size reporting", () => {
+    test("Rust trait includes memory_size with default impl", () => {
+      const spec = makeSpec("Image", [], []);
+      const files = createRustHybridObject(spec);
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain("fn memory_size(&self) -> usize { 0 }");
+    });
+
+    test("Rust FFI shim for memory_size exists", () => {
+      const spec = makeSpec("Image", [], []);
+      const files = createRustHybridObject(spec);
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain(
+        "HybridImageSpec_memory_size(ptr: *mut std::ffi::c_void) -> usize",
+      );
+    });
+
+    test("C++ bridge overrides getExternalMemorySize", () => {
+      const spec = makeSpec("Image", [], []);
+      const files = createRustHybridObject(spec);
+      const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
+      expect(hpp.content).toContain(
+        "size_t getExternalMemorySize() noexcept override",
+      );
+      expect(hpp.content).toContain("HybridImageSpec_memory_size(_rustPtr)");
+    });
+
+    test("C++ bridge declares memory_size extern", () => {
+      const spec = makeSpec("Image", [], []);
+      const files = createRustHybridObject(spec);
+      const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
+      expect(hpp.content).toContain(
+        "size_t HybridImageSpec_memory_size(void* rustPtr)",
+      );
+    });
+  });
+
+  describe("Promise-returning methods", () => {
+    test("Rust trait returns inner type synchronously for Promise<string>", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [
+          new Method("fetchName", new PromiseType(new StringType()), [
+            new Parameter("id", new NumberType()),
+          ]),
+        ],
+      );
+      const files = createRustHybridObject(spec);
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+
+      // Trait should return String, not Promise<String>
+      expect(rsFile.content).toContain(
+        "fn fetch_name(&mut self, id: f64) -> String;",
+      );
+      // Should NOT reference Promise in the Rust file
+      expect(rsFile.content).not.toContain("Promise");
+    });
+
+    test("Rust FFI shim returns inner FFI type for Promise<string>", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [new Method("fetchName", new PromiseType(new StringType()), [])],
+      );
+      const files = createRustHybridObject(spec);
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+
+      // FFI shim should return *const c_char (inner type), not void* (Promise)
+      expect(rsFile.content).toContain("-> *const std::ffi::c_char");
+      // The FFI shim function should not return void* (that would mean Promise was not unwrapped)
+      expect(rsFile.content).not.toContain(
+        "fn HybridImageSpec_fetch_name(ptr: *mut std::ffi::c_void) -> *mut std::ffi::c_void",
+      );
+    });
+
+    test("C++ bridge wraps Promise<string> in Promise::async()", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [
+          new Method("fetchName", new PromiseType(new StringType()), [
+            new Parameter("id", new NumberType()),
+          ]),
+        ],
+      );
+      const files = createRustHybridObject(spec);
+      const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
+
+      // C++ method return type should be shared_ptr<Promise<std::string>>
+      expect(hpp.content).toContain(
+        "std::shared_ptr<Promise<std::string>> fetchName(",
+      );
+      // Should wrap in Promise::async
+      expect(hpp.content).toContain("Promise<std::string>::async(");
+      // extern "C" should use const char* (inner type FFI), not void*
+      expect(hpp.content).toContain(
+        "const char* HybridImageSpec_fetch_name(void* rustPtr",
+      );
+    });
+
+    test("C++ bridge wraps Promise<void> in Promise::async()", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [new Method("doWork", new PromiseType(new VoidType()), [])],
+      );
+      const files = createRustHybridObject(spec);
+      const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
+
+      // C++ method return type should be shared_ptr<Promise<void>>
+      expect(hpp.content).toContain("std::shared_ptr<Promise<void>> doWork(");
+      // Should wrap in Promise<void>::async
+      expect(hpp.content).toContain("Promise<void>::async(");
+      // extern "C" should return void
+      expect(hpp.content).toContain(
+        "void HybridImageSpec_do_work(void* rustPtr)",
+      );
+    });
+
+    test("Rust trait returns inner type synchronously for Promise<void>", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [new Method("doWork", new PromiseType(new VoidType()), [])],
+      );
+      const files = createRustHybridObject(spec);
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+
+      // Trait should have no return type (void)
+      expect(rsFile.content).toContain("fn do_work(&mut self);");
+    });
+
+    test("C++ bridge wraps Promise<number> correctly", () => {
+      const spec = makeSpec(
+        "Image",
+        [],
+        [new Method("compute", new PromiseType(new NumberType()), [])],
+      );
+      const files = createRustHybridObject(spec);
+      const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
+
+      // extern "C" should return double (not void*)
+      expect(hpp.content).toContain(
+        "double HybridImageSpec_compute(void* rustPtr)",
+      );
+      // C++ method should wrap in Promise::async
+      expect(hpp.content).toContain("Promise<double>::async(");
+    });
+  });
+
+  describe("Callback (Func_*) structs", () => {
+    test("Func_* struct has destroy_fn field", () => {
+      const callbackType = new FunctionType(new VoidType(), [
+        new NamedWrappingType("value", new NumberType()),
+      ]);
+      const file = createRustFunction(callbackType);
+      expect(file.content).toContain(
+        'destroy_fn: unsafe extern "C" fn(*mut std::ffi::c_void)',
+      );
+    });
+
+    test("Func_* struct has Drop impl", () => {
+      const callbackType = new FunctionType(new VoidType(), [
+        new NamedWrappingType("value", new NumberType()),
+      ]);
+      const file = createRustFunction(callbackType);
+      expect(file.content).toContain("impl Drop for");
+      expect(file.content).toContain("(self.destroy_fn)(self.userdata)");
+    });
+
+    test("Func_* new() accepts destroy_fn", () => {
+      const callbackType = new FunctionType(new VoidType(), [
+        new NamedWrappingType("value", new NumberType()),
+      ]);
+      const file = createRustFunction(callbackType);
+      expect(file.content).toContain("destroy_fn: unsafe extern");
+      expect(file.content).toContain("Self { fn_ptr, userdata, destroy_fn }");
     });
   });
 });

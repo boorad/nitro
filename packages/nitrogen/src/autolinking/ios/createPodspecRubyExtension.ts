@@ -72,11 +72,51 @@ def add_nitrogen_files(spec)
 ${
   hasRust
     ? `
-  # Link the Rust static library.
-  # The Rust library must be pre-built with \`cargo build\` for the target architecture.
-  # Set the NITRO_RUST_LIB_DIR environment variable, or it defaults to
-  # nitrogen/generated/shared/rust/target/<arch>/release.
-  rust_lib_dir = ENV['NITRO_RUST_LIB_DIR'] || File.join(__dir__, '..', 'shared', 'rust', 'target')
+  # Build and link the Rust static library.
+  # cargo is invoked automatically as a script phase before compilation.
+  rust_src_dir = File.join(__dir__, '..', 'shared', 'rust')
+  rust_lib_dir = ENV['NITRO_RUST_LIB_DIR'] || File.join(rust_src_dir, 'target')
+
+  spec.script_phases = [{
+    :name => 'Build Rust Library',
+    :script => %Q{
+      set -e
+      RUST_SRC_DIR="#{rust_src_dir}"
+      RUST_LIB_DIR="#{rust_lib_dir}"
+
+      # Determine Rust target triple from Xcode build settings
+      if [ "$PLATFORM_NAME" = "iphonesimulator" ]; then
+        if [ "$ARCHS" = "x86_64" ]; then
+          RUST_TARGET="x86_64-apple-ios"
+        else
+          RUST_TARGET="aarch64-apple-ios-sim"
+        fi
+      elif [ "$PLATFORM_NAME" = "macosx" ]; then
+        if [ "$ARCHS" = "x86_64" ]; then
+          RUST_TARGET="x86_64-apple-darwin"
+        else
+          RUST_TARGET="aarch64-apple-darwin"
+        fi
+      else
+        RUST_TARGET="aarch64-apple-ios"
+      fi
+
+      if ! command -v cargo &> /dev/null; then
+        export PATH="$HOME/.cargo/bin:$PATH"
+      fi
+
+      echo "Building Rust library for $RUST_TARGET..."
+      cd "$RUST_SRC_DIR"
+      cargo build --release --target "$RUST_TARGET"
+
+      # Copy the built library to the expected location
+      mkdir -p "$RUST_LIB_DIR"
+      cp "target/$RUST_TARGET/release/lib*.a" "$RUST_LIB_DIR/" 2>/dev/null || true
+    },
+    :execution_position => :before_compile,
+    :shell_path => '/bin/sh',
+  }]
+
   current_vendored_libraries = Array(spec.attributes_hash['vendored_libraries'])
   spec.vendored_libraries = current_vendored_libraries + [
     File.join(rust_lib_dir, "lib${name}_rust.a")

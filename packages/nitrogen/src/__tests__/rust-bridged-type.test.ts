@@ -466,10 +466,18 @@ describe("RustCxxBridgedType", () => {
   describe("parse - array buffer conversions", () => {
     const bridged = new RustCxxBridgedType(new ArrayBufferType());
 
-    test("C++ to Rust (in Rust): Box::from_raw to Vec<u8>", () => {
+    test("C++ to Rust (in Rust): Box::from_raw to NitroBuffer", () => {
       const code = bridged.parse("buf", "c++", "rust", "rust");
       expect(code).toContain("Box::from_raw");
-      expect(code).toContain("Vec<u8>");
+      expect(code).toContain("NitroBuffer");
+    });
+
+    test("C++ to Rust (in C++): creates NitroBuffer struct with zero-copy", () => {
+      const code = bridged.parse("buf", "c++", "rust", "c++");
+      expect(code).toContain("__NB");
+      expect(code).toContain("data");
+      expect(code).toContain("release_fn");
+      expect(code).toContain("shared_ptr<ArrayBuffer>");
     });
 
     test("Rust to C++ (in Rust): Box::into_raw", () => {
@@ -477,10 +485,11 @@ describe("RustCxxBridgedType", () => {
       expect(code).toContain("Box::into_raw");
     });
 
-    test("Rust to C++ (in C++): move shared_ptr", () => {
+    test("Rust to C++ (in C++): unwrap NitroBuffer and wrap in ArrayBuffer", () => {
       const code = bridged.parse("buf", "rust", "c++", "c++");
-      expect(code).toContain("std::move");
-      expect(code).toContain("ArrayBuffer");
+      expect(code).toContain("ArrayBuffer::wrap");
+      expect(code).toContain("__NB");
+      expect(code).toContain("release");
     });
   });
 });

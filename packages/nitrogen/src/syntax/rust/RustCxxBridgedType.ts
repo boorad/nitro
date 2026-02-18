@@ -274,17 +274,87 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
           default:
             return parameterName;
         }
-      case "function":
+      case "function": {
+        const funcType = getTypeAs(this.type, FunctionType);
         switch (inLanguage) {
-          case "rust":
-            // Reconstruct Box<dyn Fn> from void pointer
-            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
-          case "c++":
-            // Box the std::function and pass as void*
-            return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+          case "rust": {
+            // Reconstruct Func_* wrapper from void pointer, then wrap in a closure
+            // so the trait receives Box<dyn Fn(...)> as expected.
+            const funcStructName = funcType.specializationName;
+            const funcStructPath = `super::${funcStructName}::${funcStructName}`;
+            const rustParams = funcType.parameters.map(
+              (p, i) => `__p${i}: ${p.getCode("rust")}`,
+            );
+            const callArgs = funcType.parameters.map((_p, i) => `__p${i}`);
+            const rustReturnType = funcType.returnType.getCode("rust");
+            const returnSuffix =
+              rustReturnType === "()" ? "" : ` -> ${rustReturnType}`;
+            return (
+              `{ let __wrapper = Box::from_raw(${parameterName} as *mut ${funcStructPath}); ` +
+              `let __cb: ${this.type.getCode("rust")} = Box::new(move |${rustParams.join(", ")}|${returnSuffix} { unsafe { __wrapper.call(${callArgs.join(", ")}) } }); ` +
+              `__cb }`
+            );
+          }
+          case "c++": {
+            // Create a Func_* C struct on the heap: { fn_ptr, userdata, destroy_fn }
+            // This matches the Rust #[repr(C)] Func_* layout exactly.
+            // fn_ptr is a trampoline that casts userdata back to std::function and calls it.
+            // destroy_fn frees the boxed std::function when Rust drops the Func_*.
+            const cppFnType = this.type.getCode("c++");
+            const returnBridged = new RustCxxBridgedType(funcType.returnType);
+            const ffiReturnType = returnBridged.getCppFfiType();
+
+            // Trampoline parameters (FFI-compatible types)
+            const trampolineParams = funcType.parameters.map((p, i) => {
+              const bridged = new RustCxxBridgedType(p);
+              return `${bridged.getCppFfiType()} __a${i}`;
+            });
+            const fnPtrParamTypes = [
+              "void*",
+              ...funcType.parameters.map((p) => {
+                const bridged = new RustCxxBridgedType(p);
+                return bridged.getCppFfiType();
+              }),
+            ].join(", ");
+            const trampolineSig = ["void* __ud", ...trampolineParams].join(
+              ", ",
+            );
+
+            // Convert FFI args back to C++ types for calling the std::function
+            const callArgs = funcType.parameters.map((p, i) => {
+              const bridged = new RustCxxBridgedType(p);
+              if (bridged.needsSpecialHandling) {
+                return bridged.parseFromRustToCpp(`__a${i}`, "c++");
+              }
+              return `__a${i}`;
+            });
+
+            let trampolineBody: string;
+            if (funcType.returnType.kind === "void") {
+              trampolineBody = `(*static_cast<${cppFnType}*>(__ud))(${callArgs.join(", ")});`;
+            } else if (returnBridged.needsSpecialHandling) {
+              const converted = returnBridged.parseFromCppToRust("__r", "c++");
+              trampolineBody = `auto __r = (*static_cast<${cppFnType}*>(__ud))(${callArgs.join(", ")}); return ${converted};`;
+            } else {
+              trampolineBody = `return (*static_cast<${cppFnType}*>(__ud))(${callArgs.join(", ")});`;
+            }
+
+            const returnArrow =
+              ffiReturnType === "void" ? "" : `-> ${ffiReturnType} `;
+            return (
+              `[&]() -> void* { ` +
+              `struct __W { ${ffiReturnType}(*fn_ptr)(${fnPtrParamTypes}); void* userdata; void(*destroy_fn)(void*); }; ` +
+              `return static_cast<void*>(new __W { ` +
+              `[](${trampolineSig}) ${returnArrow}{ ${trampolineBody} }, ` +
+              `static_cast<void*>(new ${cppFnType}(std::move(${parameterName}))), ` +
+              `[](void* __ud) { delete static_cast<${cppFnType}*>(__ud); } ` +
+              `}); }()`
+            );
+          }
           default:
             return parameterName;
         }
+      }
       case "hybrid-object":
         switch (inLanguage) {
           case "rust":
@@ -308,11 +378,22 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "array-buffer":
         switch (inLanguage) {
           case "rust":
-            // Reconstruct Vec<u8> from void pointer
-            return `*Box::from_raw(${parameterName} as *mut Vec<u8>)`;
+            // Reconstruct NitroBuffer from void pointer
+            return `*Box::from_raw(${parameterName} as *mut super::NitroBuffer::NitroBuffer)`;
           case "c++":
-            // Box the ArrayBuffer and pass as void*
-            return `static_cast<void*>(new std::shared_ptr<ArrayBuffer>(std::move(${parameterName})))`;
+            // Create a NitroBuffer C struct on the heap with zero-copy access to the ArrayBuffer's data.
+            // The handle holds a boxed shared_ptr<ArrayBuffer> to prevent deallocation.
+            // The release_fn frees the boxed shared_ptr when Rust drops the NitroBuffer.
+            return (
+              `[&]() -> void* { ` +
+              `struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; ` +
+              `auto __sp = new std::shared_ptr<ArrayBuffer>(std::move(${parameterName})); ` +
+              `return static_cast<void*>(new __NB { ` +
+              `(*__sp)->data(), (*__sp)->size(), ` +
+              `static_cast<void*>(__sp), ` +
+              `[](void* __h) { delete static_cast<std::shared_ptr<ArrayBuffer>*>(__h); } ` +
+              `}); }()`
+            );
           default:
             return parameterName;
         }
@@ -414,8 +495,10 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "function":
         switch (inLanguage) {
           case "rust":
+            // Box the Func_* wrapper and leak as void pointer
             return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
           case "c++":
+            // Reconstruct std::function from Func_* struct
             return `std::move(*static_cast<${this.type.getCode("c++")}*>(${parameterName}))`;
           default:
             return parameterName;
@@ -434,9 +517,21 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "array-buffer":
         switch (inLanguage) {
           case "rust":
+            // Box the NitroBuffer and leak as void pointer for C++ to unbox
             return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
           case "c++":
-            return `std::move(*static_cast<std::shared_ptr<ArrayBuffer>*>(${parameterName}))`;
+            // Unbox NitroBuffer from void*, read data/len, and create an ArrayBuffer wrapping that memory.
+            // Ownership of the NitroBuffer is transferred to the ArrayBuffer's destructor.
+            return (
+              `[&]() -> std::shared_ptr<ArrayBuffer> { ` +
+              `struct __NB { uint8_t* data; size_t len; void* handle; void(*release_fn)(void*); }; ` +
+              `auto __nb = static_cast<__NB*>(${parameterName}); ` +
+              `auto __data = __nb->data; auto __len = __nb->len; ` +
+              `auto __handle = __nb->handle; auto __release = __nb->release_fn; ` +
+              `delete __nb; ` +
+              `return ArrayBuffer::wrap(__data, __len, [=]() { __release(__handle); }); ` +
+              `}()`
+            );
           default:
             return parameterName;
         }

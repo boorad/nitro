@@ -12,9 +12,11 @@
     clippy::all
 )]
 
+use super::NitroBuffer::NitroBuffer;
+
 /// Struct `OptionalWrapper` — auto-generated from TypeScript.
 #[repr(C)]
 pub struct OptionalWrapper {
-    pub optional_array_buffer: Option<Vec<u8>>,
+    pub optional_array_buffer: Option<NitroBuffer>,
     pub optional_string: Option<String>,
 }
