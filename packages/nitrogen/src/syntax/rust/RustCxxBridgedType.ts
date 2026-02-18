@@ -288,8 +288,8 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "hybrid-object":
         switch (inLanguage) {
           case "rust":
-            // Opaque pointer to trait object — kept as-is
-            return parameterName;
+            // Reconstruct Box<dyn Trait> from opaque void pointer
+            return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
           case "c++":
             // Extract raw pointer from shared_ptr
             return `static_cast<void*>(${parameterName}.get())`;
@@ -423,8 +423,8 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
       case "hybrid-object":
         switch (inLanguage) {
           case "rust":
-            // Opaque pointer — kept as-is
-            return parameterName;
+            // Box the trait object and leak it as a void pointer
+            return `Box::into_raw(Box::new(${parameterName})) as *mut std::ffi::c_void`;
           case "c++":
             // This would require reconstructing a shared_ptr — complex
             return parameterName;

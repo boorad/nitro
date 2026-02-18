@@ -1,6 +1,7 @@
 import type { SourceFile } from "../SourceFile.js";
 import {
   createFileMetadataString,
+  createRustFileMetadataString,
   isNotDuplicate,
   toSnakeCase,
 } from "../helpers.js";
@@ -17,11 +18,8 @@ import { RustCxxBridgedType } from "./RustCxxBridgedType.js";
 export function createRustHybridObject(spec: HybridObjectSpec): SourceFile[] {
   const files: SourceFile[] = [];
 
-  // 1. Generate Rust trait file (uses native Rust types)
-  files.push(createRustTrait(spec));
-
-  // 2. Generate Rust FFI shim file (uses C-compatible types at boundary)
-  files.push(createRustFfiShims(spec));
+  // 1. Generate combined Rust trait + FFI shim file
+  files.push(createRustTraitAndFfi(spec));
 
   // 3. Generate C++ bridge header (uses C-compatible types at boundary)
   files.push(createCppRustBridgeHeader(spec));
@@ -43,34 +41,7 @@ export function createRustHybridObject(spec: HybridObjectSpec): SourceFile[] {
   return files;
 }
 
-function createRustTrait(spec: HybridObjectSpec): SourceFile {
-  const name = getHybridObjectName(spec.name);
-
-  const properties = spec.properties.map((p) => p.getCode("rust")).join("\n");
-  const methods = spec.methods.map((m) => m.getCode("rust")).join("\n");
-
-  const traitCode = `
-${createFileMetadataString(`${name.HybridTSpec}.rs`)}
-
-pub trait ${name.HybridTSpec}: Send + Sync {
-    // Properties
-    ${indent(properties, "    ")}
-
-    // Methods
-    ${indent(methods, "    ")}
-}
-  `.trim();
-
-  return {
-    content: traitCode,
-    name: `${name.HybridTSpec}.rs`,
-    subdirectory: [],
-    language: "rust",
-    platform: "shared",
-  };
-}
-
-function createRustFfiShims(spec: HybridObjectSpec): SourceFile {
+function createRustTraitAndFfi(spec: HybridObjectSpec): SourceFile {
   const name = getHybridObjectName(spec.name);
 
   const shims: string[] = [];
@@ -214,17 +185,41 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_destroy(ptr: *mut std::ffi::c_void)
   `.trim(),
   );
 
-  const ffiCode = `
-${createFileMetadataString(`${name.HybridTSpec}_ffi.rs`)}
+  // Collect Rust use imports from all property/method types
+  const rustImports = [
+    ...spec.properties.flatMap((p) => p.getRequiredImports("rust")),
+    ...spec.methods.flatMap((m) => m.getRequiredImports("rust")),
+  ]
+    .filter((i) => i.language === "rust")
+    .filter((i) => !i.name.endsWith(`::${name.HybridTSpec}`))
+    .map((i) => `use ${i.name};`)
+    .filter(isNotDuplicate);
+  const importsBlock =
+    rustImports.length > 0 ? "\n" + rustImports.join("\n") + "\n" : "";
 
-use super::${name.HybridTSpec};
+  // Generate trait definition
+  const properties = spec.properties.map((p) => p.getCode("rust")).join("\n");
+  const methods = spec.methods.map((m) => m.getCode("rust")).join("\n");
+
+  const code = `
+${createRustFileMetadataString(`${name.HybridTSpec}.rs`)}
+${importsBlock}
+pub trait ${name.HybridTSpec}: Send + Sync {
+    // Properties
+    ${indent(properties, "    ")}
+
+    // Methods
+    ${indent(methods, "    ")}
+}
+
+// FFI shims for C++ bridge
 
 ${shims.join("\n\n")}
   `.trim();
 
   return {
-    content: ffiCode,
-    name: `${name.HybridTSpec}_ffi.rs`,
+    content: code,
+    name: `${name.HybridTSpec}.rs`,
     subdirectory: [],
     language: "rust",
     platform: "shared",

@@ -45,7 +45,7 @@ describe("Rust HybridObject Generator", () => {
   test("generates correct number of files", () => {
     const spec = makeSpec("Image", [], []);
     const files = createRustHybridObject(spec);
-    expect(files).toHaveLength(4);
+    expect(files).toHaveLength(3);
   });
 
   test("generates files with correct names", () => {
@@ -53,7 +53,6 @@ describe("Rust HybridObject Generator", () => {
     const files = createRustHybridObject(spec);
     const names = files.map((f) => f.name);
     expect(names).toContain("HybridImageSpec.rs");
-    expect(names).toContain("HybridImageSpec_ffi.rs");
     expect(names).toContain("HybridImageSpecRust.hpp");
     expect(names).toContain("HybridImageSpecRust.cpp");
   });
@@ -65,10 +64,6 @@ describe("Rust HybridObject Generator", () => {
     const traitFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
     expect(traitFile.language).toBe("rust");
     expect(traitFile.platform).toBe("shared");
-
-    const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-    expect(ffiFile.language).toBe("rust");
-    expect(ffiFile.platform).toBe("shared");
 
     const hppFile = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
     expect(hppFile.language).toBe("c++");
@@ -151,14 +146,7 @@ describe("Rust HybridObject Generator", () => {
     });
   });
 
-  describe("Rust FFI shims file", () => {
-    test("imports the trait", () => {
-      const spec = makeSpec("Image", [], []);
-      const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain("use super::HybridImageSpec;");
-    });
-
+  describe("Rust FFI shims (in combined file)", () => {
     test("generates property getter shim", () => {
       const spec = makeSpec(
         "Image",
@@ -166,12 +154,12 @@ describe("Rust HybridObject Generator", () => {
         [],
       );
       const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain(
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain(
         'pub unsafe extern "C" fn HybridImageSpec_get_width',
       );
-      expect(ffiFile.content).toContain("-> f64");
-      expect(ffiFile.content).toContain("obj.get_width()");
+      expect(rsFile.content).toContain("-> f64");
+      expect(rsFile.content).toContain("obj.get_width()");
     });
 
     test("generates property setter shim for non-readonly", () => {
@@ -181,9 +169,9 @@ describe("Rust HybridObject Generator", () => {
         [],
       );
       const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain("HybridImageSpec_get_name");
-      expect(ffiFile.content).toContain("HybridImageSpec_set_name");
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain("HybridImageSpec_get_name");
+      expect(rsFile.content).toContain("HybridImageSpec_set_name");
     });
 
     test("does not generate setter shim for readonly", () => {
@@ -193,9 +181,9 @@ describe("Rust HybridObject Generator", () => {
         [],
       );
       const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain("HybridImageSpec_get_width");
-      expect(ffiFile.content).not.toContain("HybridImageSpec_set_width");
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain("HybridImageSpec_get_width");
+      expect(rsFile.content).not.toContain("HybridImageSpec_set_width");
     });
 
     test("generates method shim", () => {
@@ -210,22 +198,22 @@ describe("Rust HybridObject Generator", () => {
         ],
       );
       const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain(
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain(
         'pub unsafe extern "C" fn HybridImageSpec_resize',
       );
-      expect(ffiFile.content).toContain("width: f64, height: f64");
-      expect(ffiFile.content).toContain("obj.resize(width, height)");
+      expect(rsFile.content).toContain("width: f64, height: f64");
+      expect(rsFile.content).toContain("obj.resize(width, height)");
     });
 
     test("generates destroy shim", () => {
       const spec = makeSpec("Image", [], []);
       const files = createRustHybridObject(spec);
-      const ffiFile = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffiFile.content).toContain(
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
+      expect(rsFile.content).toContain(
         'pub unsafe extern "C" fn HybridImageSpec_destroy',
       );
-      expect(ffiFile.content).toContain("Box::from_raw");
+      expect(rsFile.content).toContain("Box::from_raw");
     });
   });
 
@@ -376,18 +364,17 @@ describe("Rust HybridObject Generator", () => {
         "fn get_pixel(&mut self, x: f64, y: f64) -> Option<f64>;",
       );
 
-      // FFI file
-      const ffi = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
-      expect(ffi.content).toContain("HybridImageSpec_get_width");
-      expect(ffi.content).toContain("HybridImageSpec_get_height");
-      expect(ffi.content).toContain("HybridImageSpec_get_label");
-      expect(ffi.content).toContain("HybridImageSpec_set_label");
-      expect(ffi.content).not.toContain("HybridImageSpec_set_width");
-      expect(ffi.content).not.toContain("HybridImageSpec_set_height");
-      expect(ffi.content).toContain("HybridImageSpec_resize");
-      expect(ffi.content).toContain("HybridImageSpec_to_array");
-      expect(ffi.content).toContain("HybridImageSpec_get_pixel");
-      expect(ffi.content).toContain("HybridImageSpec_destroy");
+      // FFI shims (in the same .rs file)
+      expect(trait.content).toContain("HybridImageSpec_get_width");
+      expect(trait.content).toContain("HybridImageSpec_get_height");
+      expect(trait.content).toContain("HybridImageSpec_get_label");
+      expect(trait.content).toContain("HybridImageSpec_set_label");
+      expect(trait.content).not.toContain("HybridImageSpec_set_width");
+      expect(trait.content).not.toContain("HybridImageSpec_set_height");
+      expect(trait.content).toContain("HybridImageSpec_resize");
+      expect(trait.content).toContain("HybridImageSpec_to_array");
+      expect(trait.content).toContain("HybridImageSpec_get_pixel");
+      expect(trait.content).toContain("HybridImageSpec_destroy");
 
       // C++ bridge
       const hpp = files.find((f) => f.name === "HybridImageSpecRust.hpp")!;
@@ -422,13 +409,13 @@ describe("Rust HybridObject Generator", () => {
         [],
       );
       const files = createRustHybridObject(spec);
-      const ffi = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
 
       // FFI shim should use *const c_char return type
-      expect(ffi.content).toContain("*const std::ffi::c_char");
+      expect(rsFile.content).toContain("*const std::ffi::c_char");
       // Should convert String to CString
-      expect(ffi.content).toContain("CString::new");
-      expect(ffi.content).toContain("into_raw");
+      expect(rsFile.content).toContain("CString::new");
+      expect(rsFile.content).toContain("into_raw");
     });
 
     test("string method parameter uses const char* at FFI boundary", () => {
@@ -442,13 +429,13 @@ describe("Rust HybridObject Generator", () => {
         ],
       );
       const files = createRustHybridObject(spec);
-      const ffi = files.find((f) => f.name === "HybridImageSpec_ffi.rs")!;
+      const rsFile = files.find((f) => f.name === "HybridImageSpec.rs")!;
 
       // FFI shim should receive *const c_char
-      expect(ffi.content).toContain("name: *const std::ffi::c_char");
+      expect(rsFile.content).toContain("name: *const std::ffi::c_char");
       // Should convert c_char to String for the trait call
-      expect(ffi.content).toContain("CStr::from_ptr");
-      expect(ffi.content).toContain("to_string_lossy");
+      expect(rsFile.content).toContain("CStr::from_ptr");
+      expect(rsFile.content).toContain("to_string_lossy");
     });
 
     test("string method return uses const char* at FFI boundary in C++ bridge", () => {

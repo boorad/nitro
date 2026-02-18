@@ -1,5 +1,5 @@
 import type { SourceFile } from "../SourceFile.js";
-import { createFileMetadataString } from "../helpers.js";
+import { createRustFileMetadataString } from "../helpers.js";
 import type { EnumMember, EnumType } from "../types/EnumType.js";
 
 /**
@@ -14,14 +14,14 @@ export function createRustEnum(enumType: EnumType): SourceFile {
 
   const rustMembers = members
     .map((m) => `${toRustEnumMemberName(m)} = ${m.value},`)
-    .join("\n");
+    .join("\n    ");
 
   const fromI32Cases = members
     .map((m) => `${m.value} => Some(${enumName}::${toRustEnumMemberName(m)}),`)
-    .join("\n");
+    .join("\n            ");
 
   const code = `
-${createFileMetadataString(`${enumName}.rs`)}
+${createRustFileMetadataString(`${enumName}.rs`)}
 
 /// Enum \`${enumName}\` — auto-generated from TypeScript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -40,6 +40,8 @@ target_sources(
   ../nitrogen/generated/shared/c++/views/HybridRecyclableTestViewComponent.cpp
   ../nitrogen/generated/shared/c++/HybridTestObjectCppSpec.cpp
   ../nitrogen/generated/shared/c++/HybridTestObjectSwiftKotlinSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridTestObjectRustSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridTestObjectRustSpecRust.cpp
   ../nitrogen/generated/shared/c++/HybridTestViewSpec.cpp
   ../nitrogen/generated/shared/c++/views/HybridTestViewComponent.cpp
   # Android-specific Nitrogen C++ sources

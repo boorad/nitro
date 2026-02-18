@@ -1,5 +1,5 @@
 import type { SourceFile } from "../SourceFile.js";
-import { createFileMetadataString } from "../helpers.js";
+import { createRustFileMetadataString, isNotDuplicate } from "../helpers.js";
 import type { FunctionType } from "../types/FunctionType.js";
 import { RustCxxBridgedType } from "./RustCxxBridgedType.js";
 
@@ -42,9 +42,9 @@ export function createRustFunction(funcType: FunctionType): SourceFile {
   const wrapperFields = `    fn_ptr: ${cFnType},\n    userdata: *mut std::ffi::c_void,`;
 
   // Build the call() implementation
-  const callFfiArgs = funcType.parameters.map((p, i) => {
+  const callFfiArgs = funcType.parameters.map((p) => {
     const bridged = new RustCxxBridgedType(p);
-    const argName = `arg${i}`;
+    const argName = p.escapedName;
     if (bridged.needsSpecialHandling) {
       return bridged.parseFromRustToCpp(argName, "rust");
     }
@@ -69,11 +69,22 @@ export function createRustFunction(funcType: FunctionType): SourceFile {
     .map((p, i) => `${p.escapedName}: ${rustParams[i]}`)
     .join(", ");
 
+  // Collect use imports from parameter/return types
+  const rustImports = [
+    ...funcType.parameters.flatMap((p) => p.getRequiredImports("rust")),
+    ...funcType.returnType.getRequiredImports("rust"),
+  ]
+    .filter((i) => i.language === "rust")
+    .map((i) => `use ${i.name};`)
+    .filter(isNotDuplicate);
+  const importsBlock =
+    rustImports.length > 0 ? rustImports.join("\n") + "\n" : "";
+
   const code = `
-${createFileMetadataString(`${name}.rs`)}
+${createRustFileMetadataString(`${name}.rs`)}
 
 use std::ffi;
-
+${importsBlock}
 /// FFI-safe wrapper for callback \`${name}\`.
 ///
 /// Wraps a C function pointer + userdata into a callable Rust struct.
