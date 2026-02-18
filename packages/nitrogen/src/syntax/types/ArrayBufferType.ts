@@ -23,6 +23,8 @@ export class ArrayBufferType implements Type {
         return 'ArrayBuffer'
       case 'kotlin':
         return 'ArrayBuffer'
+      case 'rust':
+        return 'Vec<u8>'
       default:
         throw new Error(
           `Language ${language} is not yet supported for ArrayBufferType!`

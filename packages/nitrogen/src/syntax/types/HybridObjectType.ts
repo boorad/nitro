@@ -110,6 +110,9 @@ export class HybridObjectType implements Type {
           return name.HybridTSpec
         }
       }
+      case 'rust': {
+        return `Box<dyn ${name.HybridTSpec}>`
+      }
       default:
         throw new Error(
           `Language ${language} is not yet supported for HybridObjectType!`
@@ -192,6 +195,10 @@ export class HybridObjectType implements Type {
             space: 'system',
           })
         }
+        break
+      }
+      case 'rust': {
+        // Rust imports are handled via `use` statements in the generated files
         break
       }
     }

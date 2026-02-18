@@ -72,6 +72,8 @@ export class VariantType implements Type {
       case 'swift':
       case 'kotlin':
         return this.getAliasName(language, options)
+      case 'rust':
+        return this.getAliasName(language, options)
       default:
         throw new Error(
           `Language ${language} is not yet supported for VariantType!`

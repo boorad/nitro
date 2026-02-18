@@ -154,6 +154,13 @@ export function isBooleanPropertyPrefix(name: string): boolean {
   return name.startsWith('is') || name.startsWith('has')
 }
 
+export function toSnakeCase(name: string): string {
+  return name
+    .replace(/([A-Z])/g, '_$1')
+    .replace(/^_/, '')
+    .toLowerCase()
+}
+
 export function isNotDuplicate<T>(item: T, index: number, array: T[]): boolean {
   return array.indexOf(item) === index
 }

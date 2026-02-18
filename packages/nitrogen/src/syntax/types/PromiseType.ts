@@ -51,6 +51,8 @@ export class PromiseType implements Type {
         return `Promise<${resultingCode}>`
       case 'kotlin':
         return `Promise<${resultingCode}>`
+      case 'rust':
+        return `Promise<${resultingCode}>`
       default:
         throw new Error(
           `Language ${language} is not yet supported for PromiseType!`

@@ -23,6 +23,8 @@ export class MapType implements Type {
         return 'AnyMap'
       case 'kotlin':
         return 'AnyMap'
+      case 'rust':
+        return 'HashMap<String, Box<dyn std::any::Any>>'
       default:
         throw new Error(
           `Language ${language} is not yet supported for MapType!`
