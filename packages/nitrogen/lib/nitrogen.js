@@ -135,7 +135,7 @@ export async function runNitrogen({ baseDirectory, outputDirectory, }) {
         filesAfter.push(nitroBufferActual);
         rustFiles.push(nitroBuffer);
         // Generate factory.rs with create_ functions for Rust-autolinked HybridObjects
-        const factory = createRustFactory();
+        const factory = createRustFactory(rustFiles);
         if (factory != null) {
             const factoryPath = path.join(outputDirectory, factory.platform, factory.language);
             const factoryActual = await writeFile(factoryPath, factory);

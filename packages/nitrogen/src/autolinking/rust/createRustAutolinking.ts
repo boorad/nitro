@@ -251,15 +251,186 @@ ${implCrateDep}
 }
 
 /**
+ * Find the matching closing delimiter for an opening one, respecting nesting.
+ * Returns the index of the closing delimiter, or -1 if not found.
+ */
+function findMatchingClose(
+  str: string,
+  startIdx: number,
+  open: string,
+  close: string,
+): number {
+  let depth = 0;
+  for (let i = startIdx; i < str.length; i++) {
+    if (str[i] === open) depth++;
+    if (str[i] === close) depth--;
+    if (depth === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * Extract the content of the outermost balanced parens starting at `(`.
+ * Handles nested parens like `Box<dyn Fn(f64) -> String>`.
+ */
+function extractBalancedParens(str: string, openIdx: number): string {
+  const closeIdx = findMatchingClose(str, openIdx, "(", ")");
+  if (closeIdx === -1) return "";
+  return str.slice(openIdx + 1, closeIdx);
+}
+
+/**
+ * Split a string on commas, but only at the top level (not inside <>, (), []).
+ * Handles `->` (Rust closure return arrow) without treating `>` as a bracket close.
+ */
+function splitTopLevelCommas(str: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i]!;
+    const prev = i > 0 ? str[i - 1] : "";
+    if (ch === "<" || ch === "(" || ch === "[") depth++;
+    // Only treat `>` as bracket close if it's not part of `->`
+    if ((ch === ">" && prev !== "-") || ch === ")" || ch === "]") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed.length > 0) parts.push(trimmed);
+  return parts;
+}
+
+/**
+ * Extract trait method signatures from a generated Rust trait file.
+ * Returns an array of method signature strings (without the trailing semicolon),
+ * excluding methods with default implementations (like `memory_size`).
+ */
+function extractTraitMethods(
+  rustContent: string,
+  traitName: string,
+): string[] {
+  // Find the trait block
+  const traitStart = rustContent.indexOf(
+    `pub trait ${traitName}: Send + Sync {`,
+  );
+  if (traitStart === -1) return [];
+
+  const traitOpenBrace = rustContent.indexOf("{", traitStart);
+  const traitEnd = findMatchingClose(rustContent, traitOpenBrace, "{", "}");
+  if (traitEnd === -1) return [];
+
+  const traitBody = rustContent.slice(traitOpenBrace + 1, traitEnd);
+
+  // Parse method signatures line by line, collecting multi-line signatures.
+  // A method starts with `fn ` and ends with either `;` (abstract) or `{` (default impl).
+  const methods: string[] = [];
+  let currentSig = "";
+  let inMethod = false;
+
+  for (const line of traitBody.split("\n")) {
+    const trimmed = line.trim();
+
+    // Skip comments and empty lines
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("///") ||
+      trimmed.length === 0
+    ) {
+      if (!inMethod) continue;
+    }
+
+    if (!inMethod && trimmed.startsWith("fn ")) {
+      inMethod = true;
+      currentSig = trimmed;
+    } else if (inMethod) {
+      currentSig += " " + trimmed;
+    }
+
+    if (inMethod) {
+      if (currentSig.includes(";")) {
+        // Abstract method (no body) — extract signature before the semicolon
+        const sigPart = currentSig.slice(0, currentSig.indexOf(";")).trim();
+        methods.push(sigPart);
+        currentSig = "";
+        inMethod = false;
+      } else if (currentSig.includes("{")) {
+        // Method with default implementation — skip it
+        currentSig = "";
+        inMethod = false;
+      }
+    }
+  }
+
+  return methods;
+}
+
+/**
+ * Parse a trait method signature into its components for delegation.
+ * Handles complex types with nested parens like `Box<dyn Fn(f64) -> String>`.
+ * Input: "fn method_name(&self, param: Type) -> ReturnType"
+ */
+function parseMethodSignature(sig: string): {
+  name: string;
+  selfParam: string;
+  params: { name: string; type: string }[];
+  returnType: string | undefined;
+} {
+  // Extract method name
+  const nameMatch = sig.match(/fn\s+(\w+)/);
+  const name = nameMatch![1]!;
+
+  // Find the outermost parameter list parens
+  const parenOpen = sig.indexOf("(");
+  const paramsStr = extractBalancedParens(sig, parenOpen);
+  const parenClose = parenOpen + 1 + paramsStr.length;
+
+  // Parse self parameter
+  const selfMatch = paramsStr.match(/&(mut\s+)?self/);
+  const selfParam = selfMatch ? (selfMatch[1] ? "&mut self" : "&self") : "&self";
+
+  // Parse remaining parameters (after self)
+  const params: { name: string; type: string }[] = [];
+  const afterSelf = paramsStr.replace(/&(mut\s+)?self\s*,?\s*/, "").trim();
+  if (afterSelf.length > 0) {
+    const paramParts = splitTopLevelCommas(afterSelf);
+    for (const part of paramParts) {
+      if (part.length === 0) continue;
+      const colonIdx = part.indexOf(":");
+      if (colonIdx === -1) continue;
+      params.push({
+        name: part.slice(0, colonIdx).trim(),
+        type: part.slice(colonIdx + 1).trim(),
+      });
+    }
+  }
+
+  // Extract return type — everything after `) ->` at the top level
+  const afterParens = sig.slice(parenClose + 1).trim();
+  const arrowMatch = afterParens.match(/^->\s*(.+)$/);
+  const returnType = arrowMatch ? arrowMatch[1]!.trim() : undefined;
+
+  return { name, selfParam, params, returnType };
+}
+
+/**
  * Generates a `factory.rs` file with `create_HybridTSpec()` factory functions
- * for each Rust-autolinked HybridObject.
+ * and `impl HybridTSpec for UserStruct` delegation blocks for each
+ * Rust-autolinked HybridObject.
  *
- * These factory functions are called from C++ via `extern "C"` to construct
- * the Rust implementation and return it as an opaque pointer.
+ * The delegation blocks bridge the user's implementation struct (which can't
+ * directly implement the generated trait due to cross-crate restrictions)
+ * to the generated trait by forwarding each method call.
  *
  * Returns `undefined` if there are no Rust-autolinked HybridObjects.
  */
-export function createRustFactory(): SourceFile | undefined {
+export function createRustFactory(
+  allFiles: SourceFile[],
+): SourceFile | undefined {
   const autolinkedHybridObjects =
     NitroConfig.current.getAutolinkedHybridObjects();
   const implCrate = NitroConfig.current.getRustImplCrate();
@@ -268,6 +439,7 @@ export function createRustFactory(): SourceFile | undefined {
 
   const traitImports: string[] = [];
   const implImports: string[] = [];
+  const implBlocks: string[] = [];
   const factories: string[] = [];
 
   for (const hybridObjectName of Object.keys(autolinkedHybridObjects)) {
@@ -284,10 +456,46 @@ export function createRustFactory(): SourceFile | undefined {
       implImports.push(`use ${implCrateIdent}::${rustClassName};`);
     }
 
+    // Find the generated trait file and extract method signatures
+    const traitFile = allFiles.find(
+      (f) => f.name === `${HybridTSpec}.rs` && f.language === "rust",
+    );
+    if (traitFile != null) {
+      const methods = extractTraitMethods(traitFile.content, HybridTSpec);
+      const delegations = methods.map((sig) => {
+        const parsed = parseMethodSignature(sig);
+        const paramNames = parsed.params.map((p) => p.name).join(", ");
+        const call = paramNames.length > 0
+          ? `self.0.${parsed.name}(${paramNames})`
+          : `self.0.${parsed.name}()`;
+        const body = parsed.returnType != null ? `${call}` : `${call}`;
+        const allParams = [
+          parsed.selfParam,
+          ...parsed.params.map((p) => `${p.name}: ${p.type}`),
+        ].join(", ");
+        const retSuffix = parsed.returnType != null ? ` -> ${parsed.returnType}` : "";
+        return `    fn ${parsed.name}(${allParams})${retSuffix} {\n        ${body}\n    }`;
+      });
+
+      implBlocks.push(
+        `/// Wrapper that delegates the generated trait to the user's implementation.
+struct ${rustClassName}Wrapper(${rustClassName});
+
+impl ${HybridTSpec} for ${rustClassName}Wrapper {
+${delegations.join("\n\n")}
+}`,
+      );
+    }
+
+    // Factory creates the wrapper, not the raw struct
+    const wrapperName = traitFile != null
+      ? `${rustClassName}Wrapper`
+      : rustClassName;
+
     factories.push(`
 #[unsafe(no_mangle)]
 pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
-    let obj: Box<dyn ${HybridTSpec}> = Box::new(${rustClassName}::new());
+    let obj: Box<dyn ${HybridTSpec}> = Box::new(${wrapperName}(${rustClassName}::new()));
     Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
 }`.trim());
   }
@@ -305,6 +513,8 @@ ${createRustFileMetadataString("factory.rs")}
 
 ${traitImports.join("\n")}
 ${implImportBlock}
+
+${implBlocks.join("\n\n")}
 
 ${factories.join("\n\n")}
   `.trim();

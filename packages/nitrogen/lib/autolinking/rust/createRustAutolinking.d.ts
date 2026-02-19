@@ -22,11 +22,13 @@ export declare function createRustLibRs(allFiles: SourceFile[]): SourceFile;
 export declare function createRustCargoToml(): SourceFile;
 /**
  * Generates a `factory.rs` file with `create_HybridTSpec()` factory functions
- * for each Rust-autolinked HybridObject.
+ * and `impl HybridTSpec for UserStruct` delegation blocks for each
+ * Rust-autolinked HybridObject.
  *
- * These factory functions are called from C++ via `extern "C"` to construct
- * the Rust implementation and return it as an opaque pointer.
+ * The delegation blocks bridge the user's implementation struct (which can't
+ * directly implement the generated trait due to cross-crate restrictions)
+ * to the generated trait by forwarding each method call.
  *
  * Returns `undefined` if there are no Rust-autolinked HybridObjects.
  */
-export declare function createRustFactory(): SourceFile | undefined;
+export declare function createRustFactory(allFiles: SourceFile[]): SourceFile | undefined;
