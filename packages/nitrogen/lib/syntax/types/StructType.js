@@ -1,0 +1,73 @@
+import { NitroConfig } from "../../config/NitroConfig.js";
+import { createCppStruct } from "../c++/CppStruct.js";
+import { getForwardDeclaration } from "../c++/getForwardDeclaration.js";
+import {} from "../SourceFile.js";
+export class StructType {
+    structName;
+    properties;
+    declarationFile;
+    constructor(structName, properties) {
+        this.structName = structName;
+        this.properties = properties;
+        this.declarationFile = createCppStruct(structName, properties);
+        if (this.structName.startsWith("__")) {
+            throw new Error(`Struct name cannot start with two underscores (__) as this is reserved syntax for Nitrogen! (In ${this.structName})`);
+        }
+        if (this.properties.length === 0) {
+            throw new Error(`Empty structs are not supported in Nitrogen! Add at least one property to ${this.structName}.`);
+        }
+    }
+    get canBePassedByReference() {
+        // It's a struct, heavy to copy.
+        return true;
+    }
+    get kind() {
+        return "struct";
+    }
+    get isEquatable() {
+        return this.properties.every((p) => p.isEquatable);
+    }
+    getCode(language, { fullyQualified } = {}) {
+        switch (language) {
+            case "c++":
+                if (fullyQualified) {
+                    return NitroConfig.current.getCxxNamespace("c++", this.structName);
+                }
+                else {
+                    return this.structName;
+                }
+            case "swift":
+                return this.structName;
+            case "kotlin":
+                return this.structName;
+            case "rust":
+                return this.structName;
+            default:
+                throw new Error(`Language ${language} is not yet supported for StructType!`);
+        }
+    }
+    getExtraFiles() {
+        const referencedTypes = this.declarationFile.referencedTypes.flatMap((r) => r.getExtraFiles());
+        return [this.declarationFile, ...referencedTypes];
+    }
+    getRequiredImports(language) {
+        const imports = [];
+        if (language === "c++") {
+            const cxxNamespace = NitroConfig.current.getCxxNamespace("c++");
+            imports.push({
+                name: this.declarationFile.name,
+                language: this.declarationFile.language,
+                forwardDeclaration: getForwardDeclaration("struct", this.structName, cxxNamespace),
+                space: "user",
+            });
+        }
+        else if (language === "rust") {
+            imports.push({
+                name: `super::${this.structName}::${this.structName}`,
+                language: "rust",
+                space: "user",
+            });
+        }
+        return imports;
+    }
+}

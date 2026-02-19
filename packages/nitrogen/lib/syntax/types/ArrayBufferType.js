@@ -1,0 +1,63 @@
+export class ArrayBufferType {
+    get canBePassedByReference() {
+        // It's a shared_ptr.
+        return true;
+    }
+    get kind() {
+        return "array-buffer";
+    }
+    get isEquatable() {
+        return true;
+    }
+    getCode(language) {
+        switch (language) {
+            case "c++":
+                return "std::shared_ptr<ArrayBuffer>";
+            case "swift":
+                return "ArrayBuffer";
+            case "kotlin":
+                return "ArrayBuffer";
+            case "rust":
+                return "NitroBuffer";
+            default:
+                throw new Error(`Language ${language} is not yet supported for ArrayBufferType!`);
+        }
+    }
+    getExtraFiles() {
+        return [];
+    }
+    getRequiredImports(language) {
+        const imports = [];
+        switch (language) {
+            case "c++":
+                imports.push({
+                    language: "c++",
+                    name: "NitroModules/ArrayBuffer.hpp",
+                    space: "system",
+                });
+                break;
+            case "swift":
+                imports.push({
+                    name: "NitroModules",
+                    language: "swift",
+                    space: "system",
+                });
+                break;
+            case "kotlin":
+                imports.push({
+                    name: "com.margelo.nitro.core.ArrayBuffer",
+                    language: "kotlin",
+                    space: "system",
+                });
+                break;
+            case "rust":
+                imports.push({
+                    name: "super::NitroBuffer::NitroBuffer",
+                    language: "rust",
+                    space: "user",
+                });
+                break;
+        }
+        return imports;
+    }
+}

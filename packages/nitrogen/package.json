@@ -9,6 +9,7 @@
   "files": [
     "lib",
     "src",
+    "tsconfig.json",
     "README.md"
   ],
   "bin": "./lib/index.js",
@@ -26,6 +27,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
+    "postinstall": "tsc",
     "build": "bun tsc",
     "test": "bun test",
     "start": "tsc && node lib/index.js",

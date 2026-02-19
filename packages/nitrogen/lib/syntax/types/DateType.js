@@ -1,0 +1,40 @@
+export class DateType {
+    get canBePassedByReference() {
+        // simple chrono value type
+        return false;
+    }
+    get kind() {
+        return 'date';
+    }
+    get isEquatable() {
+        return true;
+    }
+    getCode(language) {
+        switch (language) {
+            case 'c++':
+                return 'std::chrono::system_clock::time_point';
+            case 'swift':
+                return 'Date';
+            case 'kotlin':
+                return 'java.time.Instant';
+            case 'rust':
+                return 'f64';
+            default:
+                throw new Error(`Language ${language} is not yet supported for DateType!`);
+        }
+    }
+    getExtraFiles() {
+        return [];
+    }
+    getRequiredImports(language) {
+        const imports = [];
+        if (language === 'c++') {
+            imports.push({
+                name: 'chrono',
+                language: 'c++',
+                space: 'system',
+            });
+        }
+        return imports;
+    }
+}
