@@ -92,3 +92,6 @@ tsconfig.tsbuildinfo
 # Rust
 target/
 Cargo.lock
+
+# Agents
+.claude/settings.local.json

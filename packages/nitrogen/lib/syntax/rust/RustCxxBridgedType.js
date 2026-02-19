@@ -2,6 +2,7 @@ import { getReferencedTypes } from "../getReferencedTypes.js";
 import { EnumType } from "../types/EnumType.js";
 import { FunctionType } from "../types/FunctionType.js";
 import { getTypeAs } from "../types/getTypeAs.js";
+import { OptionalType } from "../types/OptionalType.js";
 import { StructType } from "../types/StructType.js";
 import { VariantType } from "../types/VariantType.js";
 import { createRustEnum } from "./RustEnum.js";
@@ -204,15 +205,52 @@ export class RustCxxBridgedType {
                     default:
                         return parameterName;
                 }
-            case "optional":
+            case "optional": {
+                const optType = getTypeAs(this.type, OptionalType);
+                const innerBridged = new RustCxxBridgedType(optType.wrappingType);
+                const innerFfiRust = innerBridged.getTypeCode("rust");
+                const innerFfiCpp = innerBridged.getTypeCode("c++");
                 switch (inLanguage) {
-                    case "rust":
-                        return `*Box::from_raw(${parameterName} as *mut ${this.type.getCode("rust")})`;
-                    case "c++":
-                        return `static_cast<void*>(new ${this.type.getCode("c++")}(std::move(${parameterName})))`;
+                    case "rust": {
+                        // Unbox the C struct and reconstruct Option<T>.
+                        // The struct layout: { has_value: u8, value: <ffi_type> }
+                        if (innerBridged.needsSpecialHandling) {
+                            const innerConvert = innerBridged.parseFromCppToRust("__s.value", "rust");
+                            return (`{ #[repr(C)] struct __Opt { has_value: u8, value: ${innerFfiRust} } ` +
+                                `let __s = *Box::from_raw(${parameterName} as *mut __Opt); ` +
+                                `if __s.has_value != 0 { Some(${innerConvert}) } else { None } }`);
+                        }
+                        else {
+                            return (`{ #[repr(C)] struct __Opt { has_value: u8, value: ${innerFfiRust} } ` +
+                                `let __s = *Box::from_raw(${parameterName} as *mut __Opt); ` +
+                                `if __s.has_value != 0 { Some(__s.value) } else { None } }`);
+                        }
+                    }
+                    case "c++": {
+                        // Convert std::optional<CppT> to C struct and box as void*.
+                        // Extract the inner value into a local so inner bridging sees a plain value.
+                        if (innerBridged.needsSpecialHandling) {
+                            const innerConvert = innerBridged.parseFromCppToRust("__inner", "c++");
+                            return (`[&]() -> void* { ` +
+                                `struct __Opt { uint8_t has_value; ${innerFfiCpp} value; }; ` +
+                                `auto __opt = new __Opt(); ` +
+                                `if (${parameterName}.has_value()) { auto __inner = ${parameterName}.value(); __opt->has_value = 1; __opt->value = ${innerConvert}; } ` +
+                                `else { __opt->has_value = 0; __opt->value = {}; } ` +
+                                `return static_cast<void*>(__opt); }()`);
+                        }
+                        else {
+                            return (`[&]() -> void* { ` +
+                                `struct __Opt { uint8_t has_value; ${innerFfiCpp} value; }; ` +
+                                `auto __opt = new __Opt(); ` +
+                                `if (${parameterName}.has_value()) { __opt->has_value = 1; __opt->value = static_cast<${innerFfiCpp}>(${parameterName}.value()); } ` +
+                                `else { __opt->has_value = 0; __opt->value = {}; } ` +
+                                `return static_cast<void*>(__opt); }()`);
+                        }
+                    }
                     default:
                         return parameterName;
                 }
+            }
             case "struct":
                 switch (inLanguage) {
                     case "rust":
@@ -415,8 +453,60 @@ export class RustCxxBridgedType {
                     default:
                         return parameterName;
                 }
+            case "optional": {
+                const optType = getTypeAs(this.type, OptionalType);
+                const innerBridged = new RustCxxBridgedType(optType.wrappingType);
+                const innerFfiRust = innerBridged.getTypeCode("rust");
+                const innerFfiCpp = innerBridged.getTypeCode("c++");
+                switch (inLanguage) {
+                    case "rust": {
+                        // Convert Option<T> into a C-compatible tagged struct and box it.
+                        // The struct layout: { has_value: u8, value: <ffi_type> }
+                        // For types that need special handling (e.g. String → *const c_char),
+                        // we convert the inner value before writing it into the struct.
+                        if (innerBridged.needsSpecialHandling) {
+                            const innerConvert = innerBridged.parseFromRustToCpp("__v", "rust");
+                            return (`{ #[repr(C)] struct __Opt { has_value: u8, value: ${innerFfiRust} } ` +
+                                `let __opt: __Opt = match ${parameterName} { ` +
+                                `Some(__v) => __Opt { has_value: 1, value: ${innerConvert} }, ` +
+                                `None => __Opt { has_value: 0, value: unsafe { std::mem::zeroed() } } }; ` +
+                                `Box::into_raw(Box::new(__opt)) as *mut std::ffi::c_void }`);
+                        }
+                        else {
+                            return (`{ #[repr(C)] struct __Opt { has_value: u8, value: ${innerFfiRust} } ` +
+                                `let __opt: __Opt = match ${parameterName} { ` +
+                                `Some(__v) => __Opt { has_value: 1, value: __v }, ` +
+                                `None => __Opt { has_value: 0, value: unsafe { std::mem::zeroed() } } }; ` +
+                                `Box::into_raw(Box::new(__opt)) as *mut std::ffi::c_void }`);
+                        }
+                    }
+                    case "c++": {
+                        // Unbox the C struct and reconstruct std::optional<CppType>.
+                        // The struct has { uint8_t has_value; <ffi_type> value; }.
+                        const cppInnerType = optType.wrappingType.getCode("c++");
+                        if (innerBridged.needsSpecialHandling) {
+                            const innerConvert = innerBridged.parseFromRustToCpp("__s->value", "c++");
+                            return (`[&]() -> ${this.type.getCode("c++")} { ` +
+                                `struct __Opt { uint8_t has_value; ${innerFfiCpp} value; }; ` +
+                                `auto __s = static_cast<__Opt*>(${parameterName}); ` +
+                                `${this.type.getCode("c++")} __r; ` +
+                                `if (__s->has_value) { __r = ${innerConvert}; } ` +
+                                `delete __s; return __r; }()`);
+                        }
+                        else {
+                            return (`[&]() -> ${this.type.getCode("c++")} { ` +
+                                `struct __Opt { uint8_t has_value; ${innerFfiCpp} value; }; ` +
+                                `auto __s = static_cast<__Opt*>(${parameterName}); ` +
+                                `${this.type.getCode("c++")} __r; ` +
+                                `if (__s->has_value) { __r = static_cast<${cppInnerType}>(__s->value); } ` +
+                                `delete __s; return __r; }()`);
+                        }
+                    }
+                    default:
+                        return parameterName;
+                }
+            }
             case "array":
-            case "optional":
             case "record":
             case "tuple":
             case "map":

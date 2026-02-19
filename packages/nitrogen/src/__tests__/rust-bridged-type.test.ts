@@ -450,16 +450,58 @@ describe("RustCxxBridgedType", () => {
   });
 
   describe("parse - optional conversions", () => {
-    const bridged = new RustCxxBridgedType(new OptionalType(new StringType()));
+    const stringOptBridged = new RustCxxBridgedType(
+      new OptionalType(new StringType()),
+    );
+    const numberOptBridged = new RustCxxBridgedType(
+      new OptionalType(new NumberType()),
+    );
 
-    test("C++ to Rust (in Rust): Box::from_raw to Option", () => {
-      const code = bridged.parse("opt", "c++", "rust", "rust");
-      expect(code).toContain("Box::from_raw");
+    test("Rust to C++ (in Rust): uses repr(C) __Opt struct with has_value discriminant", () => {
+      const code = stringOptBridged.parse("opt", "rust", "c++", "rust");
+      expect(code).toContain("#[repr(C)] struct __Opt");
+      expect(code).toContain("has_value: u8");
+      expect(code).toContain("Box::into_raw");
+      expect(code).toContain("match opt");
+      expect(code).toContain("Some(__v)");
+      // Inner string should be converted to CString
+      expect(code).toContain("CString::new");
     });
 
-    test("Rust to C++ (in Rust): Box::into_raw", () => {
-      const code = bridged.parse("opt", "rust", "c++", "rust");
-      expect(code).toContain("Box::into_raw");
+    test("Rust to C++ (in C++): unboxes __Opt struct and reconstructs std::optional", () => {
+      const code = stringOptBridged.parse("opt", "rust", "c++", "c++");
+      expect(code).toContain("struct __Opt");
+      expect(code).toContain("has_value");
+      expect(code).toContain("std::optional<std::string>");
+      // Inner value should be converted from const char* to std::string
+      expect(code).toContain("std::string");
+    });
+
+    test("C++ to Rust (in Rust): unboxes __Opt struct and reconstructs Option", () => {
+      const code = stringOptBridged.parse("opt", "c++", "rust", "rust");
+      expect(code).toContain("#[repr(C)] struct __Opt");
+      expect(code).toContain("Box::from_raw");
+      expect(code).toContain("has_value");
+      expect(code).toContain("Some(");
+      expect(code).toContain("None");
+    });
+
+    test("C++ to Rust (in C++): boxes __Opt struct as void*", () => {
+      const code = stringOptBridged.parse("opt", "c++", "rust", "c++");
+      expect(code).toContain("struct __Opt");
+      expect(code).toContain("has_value");
+      expect(code).toContain("static_cast<void*>");
+      // Inner string should be converted via c_str()
+      expect(code).toContain("c_str()");
+    });
+
+    test("primitive optional (number) passes inner value directly", () => {
+      const rustCode = numberOptBridged.parse("opt", "rust", "c++", "rust");
+      expect(rustCode).toContain("#[repr(C)] struct __Opt");
+      expect(rustCode).toContain("has_value: u8");
+      expect(rustCode).toContain("value: f64");
+      // Should NOT contain CString conversion for primitives
+      expect(rustCode).not.toContain("CString");
     });
   });
 
