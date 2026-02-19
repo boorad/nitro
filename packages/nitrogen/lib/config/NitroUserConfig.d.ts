@@ -8,6 +8,9 @@ export declare const NitroUserConfigSchema: z.ZodObject<{
         androidNamespace: z.ZodArray<z.ZodString>;
         androidCxxLibName: z.ZodString;
     }, z.core.$strip>;
+    rust: z.ZodOptional<z.ZodObject<{
+        implCrate: z.ZodString;
+    }, z.core.$strip>>;
     autolinking: z.ZodRecord<z.ZodString, z.ZodObject<{
         cpp: z.ZodOptional<z.ZodString>;
         swift: z.ZodOptional<z.ZodString>;

@@ -36,6 +36,11 @@ export declare class NitroConfig {
      */
     getAndroidPackageDirectory(...subPackage: string[]): string[];
     /**
+     * Get the Rust implementation crate name, if configured.
+     * Returns `undefined` if no `rust` section is in nitro.json.
+     */
+    getRustImplCrate(): string | undefined;
+    /**
      * Get the autolinking configuration of all HybridObjects.
      * Those will be generated and default-constructed.
      */

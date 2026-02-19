@@ -5,6 +5,8 @@
 # Copyright © Marc Rousavy @ Margelo
 #
 
+[workspace]
+
 [package]
 name = "nitro_test_rust"
 version = "0.1.0"

@@ -219,8 +219,16 @@ export function createRustCargoToml(): SourceFile {
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, "_");
 
+  const implCrate = NitroConfig.current.getRustImplCrate();
+  // Generated crate is at nitrogen/generated/shared/rust/ relative to project root
+  const implCrateDep = implCrate != null
+    ? `\n[dependencies]\n${implCrate} = { path = "../../../../" }\n`
+    : "";
+
   const code = `
 ${createFileMetadataString("Cargo.toml", "#")}
+
+[workspace]
 
 [package]
 name = "${crateName}_rust"
@@ -230,6 +238,7 @@ edition = "2024"
 [lib]
 path = "lib.rs"
 crate-type = ["staticlib"]
+${implCrateDep}
   `.trim();
 
   return {
@@ -253,8 +262,12 @@ crate-type = ["staticlib"]
 export function createRustFactory(): SourceFile | undefined {
   const autolinkedHybridObjects =
     NitroConfig.current.getAutolinkedHybridObjects();
+  const implCrate = NitroConfig.current.getRustImplCrate();
+  // Convert crate name to Rust identifier (e.g. "jazz-nitro" -> "jazz_nitro")
+  const implCrateIdent = implCrate?.replace(/-/g, "_");
 
-  const imports: string[] = [];
+  const traitImports: string[] = [];
+  const implImports: string[] = [];
   const factories: string[] = [];
 
   for (const hybridObjectName of Object.keys(autolinkedHybridObjects)) {
@@ -265,7 +278,11 @@ export function createRustFactory(): SourceFile | undefined {
     const { HybridTSpec } = getHybridObjectName(hybridObjectName);
     const factoryFunctionName = `create_${HybridTSpec}`;
 
-    imports.push(`use super::${HybridTSpec}::${HybridTSpec};`);
+    traitImports.push(`use super::${HybridTSpec}::${HybridTSpec};`);
+
+    if (implCrateIdent != null) {
+      implImports.push(`use ${implCrateIdent}::${rustClassName};`);
+    }
 
     factories.push(`
 #[unsafe(no_mangle)]
@@ -279,13 +296,15 @@ pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
     return undefined;
   }
 
+  const implImportBlock = implImports.length > 0
+    ? implImports.join("\n")
+    : "// TODO: Import your implementation struct(s) here.\n// Example: use my_crate::MyImpl;";
+
   const code = `
 ${createRustFileMetadataString("factory.rs")}
 
-// Import your implementation struct here.
-// Example: use super::my_impl::MyImpl;
-
-${imports.join("\n")}
+${traitImports.join("\n")}
+${implImportBlock}
 
 ${factories.join("\n\n")}
   `.trim();

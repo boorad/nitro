@@ -71,6 +71,20 @@ export const NitroUserConfigSchema = z.object({
       .refine(isNotReservedKeyword, isReservedKeywordError),
   }),
   /**
+   * Rust-specific options for the generated Rust crate.
+   */
+  rust: z
+    .object({
+      /**
+       * The Cargo crate name of the user's Rust implementation crate.
+       * This is added as a dependency in the generated Cargo.toml so that
+       * factory.rs can import the implementation structs.
+       * @example `"jazz-nitro"`
+       */
+      implCrate: z.string(),
+    })
+    .optional(),
+  /**
    * Configures the code that gets generated for autolinking (registering)
    * Hybrid Object constructors.
    *
