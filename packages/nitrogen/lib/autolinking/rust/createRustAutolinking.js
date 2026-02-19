@@ -1,5 +1,6 @@
 import { NitroConfig } from "../../config/NitroConfig.js";
 import { createFileMetadataString, createRustFileMetadataString, } from "../../syntax/helpers.js";
+import { getHybridObjectName } from "../../syntax/getHybridObjectName.js";
 /**
  * Generates a `NitroBuffer.rs` file that provides a zero-copy ArrayBuffer
  * type for use across the Rust/C++ FFI boundary.
@@ -202,7 +203,7 @@ ${createFileMetadataString("Cargo.toml", "#")}
 [package]
 name = "${crateName}_rust"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 path = "lib.rs"
@@ -211,6 +212,55 @@ crate-type = ["staticlib"]
     return {
         content: code,
         name: "Cargo.toml",
+        subdirectory: [],
+        language: "rust",
+        platform: "shared",
+    };
+}
+/**
+ * Generates a `factory.rs` file with `create_HybridTSpec()` factory functions
+ * for each Rust-autolinked HybridObject.
+ *
+ * These factory functions are called from C++ via `extern "C"` to construct
+ * the Rust implementation and return it as an opaque pointer.
+ *
+ * Returns `undefined` if there are no Rust-autolinked HybridObjects.
+ */
+export function createRustFactory() {
+    const autolinkedHybridObjects = NitroConfig.current.getAutolinkedHybridObjects();
+    const imports = [];
+    const factories = [];
+    for (const hybridObjectName of Object.keys(autolinkedHybridObjects)) {
+        const config = autolinkedHybridObjects[hybridObjectName];
+        if (config?.rust == null)
+            continue;
+        const rustClassName = config.rust;
+        const { HybridTSpec } = getHybridObjectName(hybridObjectName);
+        const factoryFunctionName = `create_${HybridTSpec}`;
+        imports.push(`use super::${HybridTSpec}::${HybridTSpec};`);
+        factories.push(`
+#[unsafe(no_mangle)]
+pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
+    let obj: Box<dyn ${HybridTSpec}> = Box::new(${rustClassName}::new());
+    Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
+}`.trim());
+    }
+    if (factories.length === 0) {
+        return undefined;
+    }
+    const code = `
+${createRustFileMetadataString("factory.rs")}
+
+// Import your implementation struct here.
+// Example: use super::my_impl::MyImpl;
+
+${imports.join("\n")}
+
+${factories.join("\n\n")}
+  `.trim();
+    return {
+        content: code,
+        name: "factory.rs",
         subdirectory: [],
         language: "rust",
         platform: "shared",

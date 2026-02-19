@@ -1,18 +1,17 @@
 import { getHybridObjectName } from "../getHybridObjectName.js";
 export function createRustHybridObjectRegistration({ hybridObjectName, rustClassName, }) {
     const { HybridTSpec, HybridTSpecRust } = getHybridObjectName(hybridObjectName);
-    // The Rust side must provide a factory function:
+    // The Rust side provides a factory function (auto-generated in factory.rs):
     //   #[unsafe(no_mangle)]
     //   pub extern "C" fn create_HybridTSpec() -> *mut c_void
-    // This is NOT auto-generated — the user must write it.
     const factoryFunctionName = `create_${HybridTSpec}`;
     return {
         requiredImports: [
             { name: `${HybridTSpecRust}.hpp`, language: "c++", space: "user" },
         ],
         cppExternDeclarations: `
-// Rust factory function — provided by the user's Rust implementation ("${rustClassName}").
-// The Rust side must define:
+// Rust factory function — auto-generated in factory.rs for "${rustClassName}".
+// The Rust side defines (in factory.rs):
 //   #[unsafe(no_mangle)]
 //   pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
 //       let obj: Box<dyn ${HybridTSpec}> = Box::new(${rustClassName}::new());

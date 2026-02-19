@@ -20,3 +20,13 @@ export declare function createRustLibRs(allFiles: SourceFile[]): SourceFile;
  * Generates a `Cargo.toml` file for the generated Rust crate.
  */
 export declare function createRustCargoToml(): SourceFile;
+/**
+ * Generates a `factory.rs` file with `create_HybridTSpec()` factory functions
+ * for each Rust-autolinked HybridObject.
+ *
+ * These factory functions are called from C++ via `extern "C"` to construct
+ * the Rust implementation and return it as an opaque pointer.
+ *
+ * Returns `undefined` if there are no Rust-autolinked HybridObjects.
+ */
+export declare function createRustFactory(): SourceFile | undefined;

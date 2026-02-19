@@ -11,7 +11,7 @@ import { Logger } from "./Logger.js";
 import { NitroConfig } from "./config/NitroConfig.js";
 import { createIOSAutolinking } from "./autolinking/createIOSAutolinking.js";
 import { createAndroidAutolinking } from "./autolinking/createAndroidAutolinking.js";
-import { createRustLibRs, createRustCargoToml, createRustNitroBuffer, } from "./autolinking/rust/createRustAutolinking.js";
+import { createRustLibRs, createRustCargoToml, createRustNitroBuffer, createRustFactory, } from "./autolinking/rust/createRustAutolinking.js";
 import { createGitAttributes } from "./createGitAttributes.js";
 import { NITROGEN_VERSION } from "./config/nitrogenVersion.js";
 export async function runNitrogen({ baseDirectory, outputDirectory, }) {
@@ -134,6 +134,14 @@ export async function runNitrogen({ baseDirectory, outputDirectory, }) {
         const nitroBufferActual = await writeFile(nitroBufferPath, nitroBuffer);
         filesAfter.push(nitroBufferActual);
         rustFiles.push(nitroBuffer);
+        // Generate factory.rs with create_ functions for Rust-autolinked HybridObjects
+        const factory = createRustFactory();
+        if (factory != null) {
+            const factoryPath = path.join(outputDirectory, factory.platform, factory.language);
+            const factoryActual = await writeFile(factoryPath, factory);
+            filesAfter.push(factoryActual);
+            rustFiles.push(factory);
+        }
         const libRs = createRustLibRs(rustFiles);
         const cargoToml = createRustCargoToml();
         for (const file of [libRs, cargoToml]) {

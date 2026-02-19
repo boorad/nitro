@@ -27,6 +27,7 @@ import {
   createRustLibRs,
   createRustCargoToml,
   createRustNitroBuffer,
+  createRustFactory,
 } from "./autolinking/rust/createRustAutolinking.js";
 import { createGitAttributes } from "./createGitAttributes.js";
 import type { PlatformSpec } from "react-native-nitro-modules";
@@ -212,6 +213,18 @@ export async function runNitrogen({
     const nitroBufferActual = await writeFile(nitroBufferPath, nitroBuffer);
     filesAfter.push(nitroBufferActual);
     rustFiles.push(nitroBuffer);
+    // Generate factory.rs with create_ functions for Rust-autolinked HybridObjects
+    const factory = createRustFactory();
+    if (factory != null) {
+      const factoryPath = path.join(
+        outputDirectory,
+        factory.platform,
+        factory.language,
+      );
+      const factoryActual = await writeFile(factoryPath, factory);
+      filesAfter.push(factoryActual);
+      rustFiles.push(factory);
+    }
     const libRs = createRustLibRs(rustFiles);
     const cargoToml = createRustCargoToml();
     for (const file of [libRs, cargoToml]) {
