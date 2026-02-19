@@ -47,7 +47,7 @@ impl Func_double {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self) -> f64 {
-        (self.fn_ptr)(self.userdata)
+        unsafe { (self.fn_ptr)(self.userdata) }
     }
 }
 

@@ -46,7 +46,9 @@ impl NitroBuffer {
         let handle = Box::into_raw(Box::new(vec)) as *mut c_void;
 
         unsafe extern "C" fn release_vec(handle: *mut c_void) {
-            drop(Box::from_raw(handle as *mut Vec<u8>));
+            unsafe {
+                drop(Box::from_raw(handle as *mut Vec<u8>));
+            }
         }
 
         NitroBuffer {
@@ -63,7 +65,7 @@ impl NitroBuffer {
     /// The caller must ensure this NitroBuffer has not been dropped
     /// and the data pointer is still valid.
     pub unsafe fn as_slice(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.data, self.len)
+        unsafe { std::slice::from_raw_parts(self.data, self.len) }
     }
 
     /// Get a mutable slice of the buffer's data.
@@ -73,7 +75,7 @@ impl NitroBuffer {
     /// the data pointer is still valid, and there are no other references
     /// to this data.
     pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.data, self.len)
+        unsafe { std::slice::from_raw_parts_mut(self.data, self.len) }
     }
 
     /// Copy the buffer's data into a new owned Vec<u8>.

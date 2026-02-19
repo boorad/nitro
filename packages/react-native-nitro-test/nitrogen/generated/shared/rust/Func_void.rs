@@ -47,7 +47,9 @@ impl Func_void {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self) {
-        (self.fn_ptr)(self.userdata);
+        unsafe {
+            (self.fn_ptr)(self.userdata);
+        }
     }
 }
 

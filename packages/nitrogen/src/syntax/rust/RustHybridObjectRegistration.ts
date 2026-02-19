@@ -15,6 +15,7 @@ interface Props {
 
 interface RustHybridObjectRegistration {
   cppCode: string;
+  cppExternDeclarations: string;
   requiredImports: SourceImport[];
 }
 
@@ -26,7 +27,7 @@ export function createRustHybridObjectRegistration({
     getHybridObjectName(hybridObjectName);
 
   // The Rust side must provide a factory function:
-  //   #[no_mangle]
+  //   #[unsafe(no_mangle)]
   //   pub extern "C" fn create_HybridTSpec() -> *mut c_void
   // This is NOT auto-generated — the user must write it.
   const factoryFunctionName = `create_${HybridTSpec}`;
@@ -35,15 +36,17 @@ export function createRustHybridObjectRegistration({
     requiredImports: [
       { name: `${HybridTSpecRust}.hpp`, language: "c++", space: "user" },
     ],
-    cppCode: `
+    cppExternDeclarations: `
 // Rust factory function — provided by the user's Rust implementation ("${rustClassName}").
 // The Rust side must define:
-//   #[no_mangle]
+//   #[unsafe(no_mangle)]
 //   pub extern "C" fn ${factoryFunctionName}() -> *mut std::ffi::c_void {
 //       let obj: Box<dyn ${HybridTSpec}> = Box::new(${rustClassName}::new());
 //       Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void
 //   }
 extern "C" void* ${factoryFunctionName}();
+      `.trim(),
+    cppCode: `
 HybridObjectRegistry::registerHybridObjectConstructor(
   "${hybridObjectName}",
   []() -> std::shared_ptr<HybridObject> {

@@ -61,11 +61,11 @@ export function createRustFunction(funcType: FunctionType): SourceFile {
       "__result",
       "rust",
     );
-    callBody = `        let __result = (self.fn_ptr)(${ffiCallArgs});\n        ${resultConversion}`;
+    callBody = `        unsafe {\n            let __result = (self.fn_ptr)(${ffiCallArgs});\n            ${resultConversion}\n        }`;
   } else if (rustReturnType === "()") {
-    callBody = `        (self.fn_ptr)(${ffiCallArgs});`;
+    callBody = `        unsafe { (self.fn_ptr)(${ffiCallArgs}); }`;
   } else {
-    callBody = `        (self.fn_ptr)(${ffiCallArgs})`;
+    callBody = `        unsafe { (self.fn_ptr)(${ffiCallArgs}) }`;
   }
 
   const callParams = funcType.parameters

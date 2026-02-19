@@ -47,10 +47,12 @@ impl Func_void_std__exception_ptr {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, error: String) {
-        (self.fn_ptr)(
-            self.userdata,
-            std::ffi::CString::new(error).unwrap().into_raw(),
-        );
+        unsafe {
+            (self.fn_ptr)(
+                self.userdata,
+                std::ffi::CString::new(error).unwrap().into_raw(),
+            );
+        }
     }
 }
 

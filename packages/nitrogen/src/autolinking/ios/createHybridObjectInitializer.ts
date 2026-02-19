@@ -21,6 +21,7 @@ export function createHybridObjectIntializer(): [ObjcFile, SwiftFile] | [] {
 
   const swiftRegistrations: string[] = [];
   const cppRegistrations: string[] = [];
+  const cppExternDecls: string[] = [];
   const cppImports: SourceImport[] = [];
   let containsSwiftObjects = false;
   for (const hybridObjectName of Object.keys(autolinkedHybridObjects)) {
@@ -49,11 +50,13 @@ export function createHybridObjectIntializer(): [ObjcFile, SwiftFile] | [] {
     }
     if (config?.rust != null) {
       // Autolink a Rust HybridObject through FFI/C++!
-      const { cppCode, requiredImports } = createRustHybridObjectRegistration({
-        hybridObjectName: hybridObjectName,
-        rustClassName: config.rust,
-      });
+      const { cppCode, cppExternDeclarations, requiredImports } =
+        createRustHybridObjectRegistration({
+          hybridObjectName: hybridObjectName,
+          rustClassName: config.rust,
+        });
       cppImports.push(...requiredImports);
+      cppExternDecls.push(cppExternDeclarations);
       cppRegistrations.push(cppCode);
     }
   }
@@ -68,6 +71,9 @@ export function createHybridObjectIntializer(): [ObjcFile, SwiftFile] | [] {
     : "";
   const imports = cppImports.map((i) => includeHeader(i, true)).join("\n");
 
+  const externDecls =
+    cppExternDecls.length > 0 ? "\n" + cppExternDecls.join("\n") + "\n" : "";
+
   const objcCode = `
 ${createFileMetadataString(`${autolinkingClassName}.mm`)}
 
@@ -77,7 +83,7 @@ ${umbrellaImport}
 #import <type_traits>
 
 ${imports}
-
+${externDecls}
 @interface ${autolinkingClassName} : NSObject
 @end
 

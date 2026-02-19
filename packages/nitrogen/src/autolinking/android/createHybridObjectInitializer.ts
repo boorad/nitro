@@ -27,6 +27,7 @@ export function createHybridObjectIntializer(): SourceFile[] {
 
   const cppHybridObjectImports: SourceImport[] = [];
   const cppRegistrations: string[] = [];
+  const cppExternDecls: string[] = [];
   for (const hybridObjectName of Object.keys(autolinkedHybridObjects)) {
     const config = autolinkedHybridObjects[hybridObjectName];
 
@@ -50,11 +51,13 @@ export function createHybridObjectIntializer(): SourceFile[] {
     }
     if (config?.rust != null) {
       // Autolink a Rust HybridObject through FFI/C++!
-      const { cppCode, requiredImports } = createRustHybridObjectRegistration({
-        hybridObjectName: hybridObjectName,
-        rustClassName: config.rust,
-      });
+      const { cppCode, cppExternDeclarations, requiredImports } =
+        createRustHybridObjectRegistration({
+          hybridObjectName: hybridObjectName,
+          rustClassName: config.rust,
+        });
       cppHybridObjectImports.push(...requiredImports);
+      cppExternDecls.push(cppExternDeclarations);
       cppRegistrations.push(cppCode);
     }
   }
@@ -91,6 +94,9 @@ namespace ${cxxNamespace} {
 } // namespace ${cxxNamespace}
 
     `;
+  const externDecls =
+    cppExternDecls.length > 0 ? "\n" + cppExternDecls.join("\n") + "\n" : "";
+
   const cppCode = `
 ${createFileMetadataString(`${autolinkingClassName}.cpp`)}
 
@@ -105,7 +111,7 @@ ${createFileMetadataString(`${autolinkingClassName}.cpp`)}
 #include <NitroModules/HybridObjectRegistry.hpp>
 
 ${includes}
-
+${externDecls}
 namespace ${cxxNamespace} {
 
 int initialize(JavaVM* vm) {

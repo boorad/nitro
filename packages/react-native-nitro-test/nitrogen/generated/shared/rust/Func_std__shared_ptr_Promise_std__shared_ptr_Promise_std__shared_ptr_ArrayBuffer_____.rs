@@ -54,8 +54,10 @@ impl Func_std__shared_ptr_Promise_std__shared_ptr_Promise_std__shared_ptr_ArrayB
 
     /// Call the wrapped function.
     pub unsafe fn call(&self) -> NitroBuffer {
-        let __result = (self.fn_ptr)(self.userdata);
-        *Box::from_raw(__result as *mut NitroBuffer)
+        unsafe {
+            let __result = (self.fn_ptr)(self.userdata);
+            *Box::from_raw(__result as *mut NitroBuffer)
+        }
     }
 }
 

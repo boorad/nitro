@@ -48,10 +48,12 @@ impl Func_void_std__vector_Powertrain_ {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, array: Vec<Powertrain>) {
-        (self.fn_ptr)(
-            self.userdata,
-            Box::into_raw(Box::new(array)) as *mut std::ffi::c_void,
-        );
+        unsafe {
+            (self.fn_ptr)(
+                self.userdata,
+                Box::into_raw(Box::new(array)) as *mut std::ffi::c_void,
+            );
+        }
     }
 }
 

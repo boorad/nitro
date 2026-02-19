@@ -47,8 +47,10 @@ impl Func_std__shared_ptr_Promise_std__string__ {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self) -> String {
-        let __result = (self.fn_ptr)(self.userdata);
-        *Box::from_raw(__result as *mut String)
+        unsafe {
+            let __result = (self.fn_ptr)(self.userdata);
+            *Box::from_raw(__result as *mut String)
+        }
     }
 }
 

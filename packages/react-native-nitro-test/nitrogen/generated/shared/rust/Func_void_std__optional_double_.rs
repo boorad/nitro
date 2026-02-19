@@ -47,10 +47,12 @@ impl Func_void_std__optional_double_ {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, maybe: Option<f64>) {
-        (self.fn_ptr)(
-            self.userdata,
-            Box::into_raw(Box::new(maybe)) as *mut std::ffi::c_void,
-        );
+        unsafe {
+            (self.fn_ptr)(
+                self.userdata,
+                Box::into_raw(Box::new(maybe)) as *mut std::ffi::c_void,
+            );
+        }
     }
 }
 

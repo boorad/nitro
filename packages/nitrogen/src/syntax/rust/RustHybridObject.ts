@@ -62,10 +62,12 @@ function createRustTraitAndFfi(spec: HybridObjectSpec): SourceFile {
       const convertedReturn = bridgedType.parseFromRustToCpp(traitCall, "rust");
       shims.push(
         `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_get_${rustPropName}(ptr: *mut std::ffi::c_void)${ffiReturnSuffix} {
-    let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
-    ${convertedReturn}
+    unsafe {
+        let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+        ${convertedReturn}
+    }
 }
     `.trim(),
       );
@@ -73,10 +75,12 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_get_${rustPropName}(ptr: *mut std::
       // Primitive: pass through directly
       shims.push(
         `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_get_${rustPropName}(ptr: *mut std::ffi::c_void)${ffiReturnSuffix} {
-    let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
-    obj.get_${rustPropName}()
+    unsafe {
+        let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+        obj.get_${rustPropName}()
+    }
 }
     `.trim(),
       );
@@ -88,20 +92,24 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_get_${rustPropName}(ptr: *mut std::
         const convertedParam = bridgedType.parseFromCppToRust("value", "rust");
         shims.push(
           `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_set_${rustPropName}(ptr: *mut std::ffi::c_void, value: ${ffiReturnType}) {
-    let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);
-    obj.set_${rustPropName}(${convertedParam});
+    unsafe {
+        let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+        obj.set_${rustPropName}(${convertedParam});
+    }
 }
       `.trim(),
         );
       } else {
         shims.push(
           `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_set_${rustPropName}(ptr: *mut std::ffi::c_void, value: ${ffiReturnType}) {
-    let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);
-    obj.set_${rustPropName}(value);
+    unsafe {
+        let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+        obj.set_${rustPropName}(value);
+    }
 }
       `.trim(),
         );
@@ -153,29 +161,29 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_set_${rustPropName}(ptr: *mut std::
     let body: string;
     if (paramConversions.length === 0 && !returnBridged.needsSpecialHandling) {
       // Simple case: no conversions needed
-      body = `    let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);\n    ${traitCall}`;
+      body = `    unsafe {\n        let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);\n        ${traitCall}\n    }`;
     } else {
       const lines: string[] = [];
       lines.push(
-        `    let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);`,
+        `        let obj = &mut *(ptr as *mut Box<dyn ${name.HybridTSpec}>);`,
       );
       for (const conv of paramConversions) {
-        lines.push(`    ${conv}`);
+        lines.push(`        ${conv}`);
       }
       if (returnBridged.needsSpecialHandling) {
-        lines.push(`    let __result = ${traitCall};`);
+        lines.push(`        let __result = ${traitCall};`);
         lines.push(
-          `    ${returnBridged.parseFromRustToCpp("__result", "rust")}`,
+          `        ${returnBridged.parseFromRustToCpp("__result", "rust")}`,
         );
       } else {
-        lines.push(`    ${traitCall}`);
+        lines.push(`        ${traitCall}`);
       }
-      body = lines.join("\n");
+      body = `    unsafe {\n${lines.join("\n")}\n    }`;
     }
 
     shims.push(
       `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_${rustMethodName}(ptr: *mut std::ffi::c_void${ffiParamsWithComma})${ffiReturnSuffix} {
 ${body}
 }
@@ -186,10 +194,12 @@ ${body}
   // Memory size shim (for GC pressure reporting)
   shims.push(
     `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_memory_size(ptr: *mut std::ffi::c_void) -> usize {
-    let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
-    obj.memory_size()
+    unsafe {
+        let obj = &*(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+        obj.memory_size()
+    }
 }
   `.trim(),
   );
@@ -197,9 +207,11 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_memory_size(ptr: *mut std::ffi::c_v
   // Destroy shim (for C++ destructor to call)
   shims.push(
     `
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ${name.HybridTSpec}_destroy(ptr: *mut std::ffi::c_void) {
-    let _ = Box::from_raw(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+    unsafe {
+        let _ = Box::from_raw(ptr as *mut Box<dyn ${name.HybridTSpec}>);
+    }
 }
   `.trim(),
   );
@@ -227,7 +239,7 @@ ${importsBlock}
 ///
 /// After implementing, provide a factory function for registration:
 /// \`\`\`rust
-/// #[no_mangle]
+/// #[unsafe(no_mangle)]
 /// pub extern "C" fn create_${name.HybridTSpec}() -> *mut std::ffi::c_void {
 ///     let obj: Box<dyn ${name.HybridTSpec}> = Box::new(My${spec.name}::new());
 ///     Box::into_raw(Box::new(obj)) as *mut std::ffi::c_void

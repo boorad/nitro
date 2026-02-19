@@ -47,8 +47,10 @@ impl Func_std__shared_ptr_Promise_double__ {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self) -> f64 {
-        let __result = (self.fn_ptr)(self.userdata);
-        *Box::from_raw(__result as *mut f64)
+        unsafe {
+            let __result = (self.fn_ptr)(self.userdata);
+            *Box::from_raw(__result as *mut f64)
+        }
     }
 }
 

@@ -47,10 +47,12 @@ impl Func_void_std__string {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, value: String) {
-        (self.fn_ptr)(
-            self.userdata,
-            std::ffi::CString::new(value).unwrap().into_raw(),
-        );
+        unsafe {
+            (self.fn_ptr)(
+                self.userdata,
+                std::ffi::CString::new(value).unwrap().into_raw(),
+            );
+        }
     }
 }
 

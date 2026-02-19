@@ -47,7 +47,9 @@ impl Func_void_double {
 
     /// Call the wrapped function.
     pub unsafe fn call(&self, value: f64) {
-        (self.fn_ptr)(self.userdata, value);
+        unsafe {
+            (self.fn_ptr)(self.userdata, value);
+        }
     }
 }
 
