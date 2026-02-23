@@ -216,6 +216,17 @@ pub unsafe extern "C" fn ${name.HybridTSpec}_destroy(ptr: *mut std::ffi::c_void)
   `.trim(),
   );
 
+  // Free a Rust-allocated CString from C++.
+  // Each bridge file emits this; the linker deduplicates via #[no_mangle].
+  shims.push(
+    `
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nitrogen_free_cstring(ptr: *mut std::ffi::c_char) {
+    unsafe { let _ = std::ffi::CString::from_raw(ptr); }
+}
+  `.trim(),
+  );
+
   // Collect Rust use imports from all property/method types
   const rustImports = [
     ...spec.properties.flatMap((p) => p.getRequiredImports("rust")),
@@ -319,6 +330,7 @@ function createCppRustBridgeHeader(spec: HybridObjectSpec): SourceFile {
 
   externDecls.push(`size_t ${name.HybridTSpec}_memory_size(void* rustPtr);`);
   externDecls.push(`void ${name.HybridTSpec}_destroy(void* rustPtr);`);
+  externDecls.push(`void __nitrogen_free_cstring(char* ptr);`);
 
   // Property implementations (getter/setter overrides) with type conversion
   const propertyImpls: string[] = [];

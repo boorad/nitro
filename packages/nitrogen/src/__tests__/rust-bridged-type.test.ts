@@ -265,10 +265,11 @@ describe("RustCxxBridgedType", () => {
       expect(code).toContain("into_raw");
     });
 
-    test("Rust to C++ (in C++): construct std::string", () => {
+    test("Rust to C++ (in C++): construct std::string and free CString", () => {
       const code = bridged.parse("name", "rust", "c++", "c++");
       expect(code).toContain("std::string");
       expect(code).toContain("name");
+      expect(code).toContain("__nitrogen_free_cstring");
     });
   });
 
@@ -320,10 +321,11 @@ describe("RustCxxBridgedType", () => {
       expect(code).toContain("into_raw");
     });
 
-    test("Rust to C++ (in C++): make_exception_ptr", () => {
+    test("Rust to C++ (in C++): make_exception_ptr and free CString", () => {
       const code = bridged.parse("err", "rust", "c++", "c++");
       expect(code).toContain("make_exception_ptr");
       expect(code).toContain("runtime_error");
+      expect(code).toContain("__nitrogen_free_cstring");
     });
   });
 
@@ -473,8 +475,9 @@ describe("RustCxxBridgedType", () => {
       expect(code).toContain("struct __Opt");
       expect(code).toContain("has_value");
       expect(code).toContain("std::optional<std::string>");
-      // Inner value should be converted from const char* to std::string
+      // Inner value should be converted from const char* to std::string and freed
       expect(code).toContain("std::string");
+      expect(code).toContain("__nitrogen_free_cstring");
     });
 
     test("C++ to Rust (in Rust): unboxes __Opt struct and reconstructs Option", () => {
@@ -493,6 +496,9 @@ describe("RustCxxBridgedType", () => {
       expect(code).toContain("static_cast<void*>");
       // Inner string should be converted via c_str()
       expect(code).toContain("c_str()");
+      // Must use const auto& to avoid dangling pointer (UAF fix)
+      expect(code).toContain("const auto& __inner");
+      expect(code).not.toContain("auto __inner");
     });
 
     test("primitive optional (number) passes inner value directly", () => {

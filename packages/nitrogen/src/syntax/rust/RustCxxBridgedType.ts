@@ -263,7 +263,7 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
                 `[&]() -> void* { ` +
                 `struct __Opt { uint8_t has_value; ${innerFfiCpp} value; }; ` +
                 `auto __opt = new __Opt(); ` +
-                `if (${parameterName}.has_value()) { auto __inner = ${parameterName}.value(); __opt->has_value = 1; __opt->value = ${innerConvert}; } ` +
+                `if (${parameterName}.has_value()) { const auto& __inner = ${parameterName}.value(); __opt->has_value = 1; __opt->value = ${innerConvert}; } ` +
                 `else { __opt->has_value = 0; __opt->value = {}; } ` +
                 `return static_cast<void*>(__opt); }()`
               );
@@ -471,7 +471,8 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
           case "rust":
             return `std::ffi::CString::new(${parameterName}).unwrap().into_raw()`;
           case "c++":
-            return `std::string(${parameterName})`;
+            // Copy the Rust-allocated CString into std::string, then free the original.
+            return `([](const char* __p) -> std::string { std::string __s(__p); __nitrogen_free_cstring(const_cast<char*>(__p)); return __s; })(${parameterName})`;
           default:
             return parameterName;
         }
@@ -498,7 +499,8 @@ export class RustCxxBridgedType implements BridgedType<"rust", "c++"> {
           case "rust":
             return `std::ffi::CString::new(${parameterName}).unwrap().into_raw()`;
           case "c++":
-            return `std::make_exception_ptr(std::runtime_error(${parameterName}))`;
+            // Copy the Rust-allocated CString into exception, then free the original.
+            return `([](const char* __p) -> std::exception_ptr { auto __e = std::make_exception_ptr(std::runtime_error(__p)); __nitrogen_free_cstring(const_cast<char*>(__p)); return __e; })(${parameterName})`;
           default:
             return parameterName;
         }

@@ -401,9 +401,10 @@ describe("Rust HybridObject Generator", () => {
       expect(hpp.content).toContain(
         "const char* HybridImageSpec_get_name(void* rustPtr)",
       );
-      // C++ method should convert const char* back to std::string
+      // C++ method should convert const char* back to std::string and free the Rust CString
       expect(hpp.content).toContain("std::string getName() override");
-      expect(hpp.content).toContain("std::string(");
+      expect(hpp.content).toContain("std::string __s(");
+      expect(hpp.content).toContain("__nitrogen_free_cstring");
     });
 
     test("string property uses *const c_char at FFI boundary in Rust shims", () => {
